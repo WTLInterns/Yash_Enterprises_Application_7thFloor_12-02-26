@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "60750068601",
+    "project_id": "zoho-cf081",
+    "storage_bucket": "zoho-cf081.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:60750068601:android:0c965d7d649b9099cc4da8",
+        "android_client_info": {
+          "package_name": "com.yashenterprises.unoloapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9XFWW3_7xvC-AmxlZONBrsShagRcIMJA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
