@@ -235,7 +235,7 @@ class BackgroundLocationService {
       }
 
       final response = await _dio.post(
-        'http://192.168.1.100:8080/api/employee-locations/$employeeId/location',
+        'http://192.168.1.102:8080/api/employee-locations/$employeeId/location',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -284,7 +284,7 @@ class BackgroundLocationService {
 
       // Send notification to admin
       await _dio.post(
-        'http://192.168.1.100:8080/api/notifications/idle-alert',
+        'http://192.168.1.102:8080/api/notifications/idle-alert',
         options: Options(
           headers: {
             'Authorization': 'Bearer ${await _storage.read(key: 'auth_token')}',

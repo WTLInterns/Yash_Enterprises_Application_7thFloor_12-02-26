@@ -23,15 +23,40 @@ class TaskApi {
     await _dio.put('/tasks/$id', data: payload);
   }
 
-  Future<void> updateTaskStatus(int id, String status, int employeeId, {Map<String, String>? headers}) async {
-    final options = headers != null ? Options(headers: headers) : null;
-    await _dio.put('/tasks/$id/status', 
-      data: {
-        'status': status,
-        'employeeId': employeeId,
-      },
-      options: options,
-    );
+  Future<void> updateTaskStatus(
+    int id, 
+    String status, 
+    int employeeId, {
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      final options = Options();
+      if (latitude != null && longitude != null) {
+        options.headers = {
+          'X-Employee-Latitude': latitude.toString(),
+          'X-Employee-Longitude': longitude.toString(),
+        };
+      }
+      
+      await _dio.put(
+        '/tasks/$id/status',
+        data: {
+          'status': status,
+          'employeeId': employeeId,
+        },
+        options: options,
+      );
+      
+    } on DioException catch (e) {
+      // Simple error handling - NO OVERENGINEERING
+      final message = _extractErrorMessage(e);
+      print('Task status update failed: $message');
+      rethrow;
+    } catch (e) {
+      print('Unexpected error: $e');
+      rethrow;
+    }
   }
 
   Future<void> deleteTask(int id) async {
@@ -40,5 +65,26 @@ class TaskApi {
 
   Future<Response> get(String path) async {
     return await _dio.get(path);
+  }
+  
+  // Simple error extraction - CLEAN & PRACTICAL
+  String _extractErrorMessage(DioException e) {
+    final response = e.response;
+    if (response?.data is Map<String, dynamic>) {
+      final data = response!.data as Map<String, dynamic>;
+      
+      // Try new error code format first
+      if (data.containsKey('error')) {
+        return data['error'] as String? ?? 'Update failed';
+      }
+      
+      // Fallback to legacy format
+      if (data.containsKey('message')) {
+        return data['message'] as String? ?? 'Update failed';
+      }
+    }
+    
+    // Fallback to HTTP status
+    return 'Update failed (${response?.statusCode ?? 'unknown'})';
   }
 }

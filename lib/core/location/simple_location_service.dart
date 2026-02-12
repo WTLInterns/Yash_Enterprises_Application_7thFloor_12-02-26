@@ -78,7 +78,7 @@ class SimpleLocationService {
       }
 
       await _dio.post(
-        'http://192.168.1.100:8080/api/employee-locations/$employeeId/location',
+        'http://192.168.1.102:8080/api/employee-locations/$employeeId/location',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
