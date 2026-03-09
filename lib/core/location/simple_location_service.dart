@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:dio/dio.dart';
+import '../config/app_config.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -10,7 +11,15 @@ class SimpleLocationService {
   SimpleLocationService._internal();
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: '${AppConfig.baseUrl}/api',
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
+      headers: {'Accept': 'application/json'},
+    ),
+  );
   
   bool _isTracking = false;
   Timer? _locationTimer;
@@ -69,7 +78,7 @@ class SimpleLocationService {
 
   Future<void> _sendLocationToServer(Position position) async {
     try {
-      final employeeId = await _storage.read(key: 'employeeId');
+      final employeeId = await _storage.read(key: 'employee_id');
       final token = await _storage.read(key: 'auth_token');
 
       if (employeeId == null || token == null) {
@@ -78,7 +87,7 @@ class SimpleLocationService {
       }
 
       await _dio.post(
-        'http://192.168.1.102:8080/api/employee-locations/$employeeId/location',
+        '/employee-locations/$employeeId/location',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',

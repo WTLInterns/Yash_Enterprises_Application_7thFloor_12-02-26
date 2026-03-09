@@ -10,6 +10,11 @@ class TaskApi {
     return (res.data as List).cast();
   }
 
+  Future<List<dynamic>> getTasksForEmployee(int employeeId) async {
+    final res = await _dio.get('/tasks/employee/$employeeId');
+    return (res.data as List).cast();
+  }
+
   Future<Map<String, dynamic>> getTask(int id) async {
     final res = await _dio.get('/tasks/$id');
     return Map<String, dynamic>.from(res.data as Map);

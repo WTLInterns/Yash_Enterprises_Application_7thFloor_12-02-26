@@ -362,10 +362,10 @@ class RobustLocationService {
 
       print('📍 Sending location to server: ${position.latitude}, ${position.longitude}');
       print('👤 Employee ID: $employeeId');
-      print('🌐 URL: http://192.168.1.102:8080/api/employee-locations/$employeeId/location');
+      print('🌐 URL: http://192.168.1.100:8080/api/employee-locations/$employeeId/location');
 
       final response = await _dio.post(
-        'http://192.168.1.102:8080/api/employee-locations/$employeeId/location',
+        'http://192.168.1.100:8080/api/employee-locations/$employeeId/location',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -420,7 +420,7 @@ class RobustLocationService {
 
       // Send notification to admin
       await _dio.post(
-        'http://192.168.1.102:8080/api/employee-locations/idle-alert',
+        '/employee-locations/idle-alert',
         options: Options(
           headers: {
             'Authorization': 'Bearer ${await _storage.read(key: 'auth_token')}',

@@ -57,7 +57,8 @@ dependencies:
   
   # WebSocket dependencies for real-time updates
   web_socket_channel: ^2.4.0
-  stomp_dart_client: ^1.0.2
+  stomp_dart_client: ^3.0.1
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../../core/storage/secure_session_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/distance_calculator.dart';
 import '../../../../core/location/location_provider.dart';
@@ -17,8 +19,25 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return TaskRepository(api: ref.watch(taskApiProvider));
 });
 
+final secureStorageProvider = Provider<SecureSessionStorage>((ref) {
+  return SecureSessionStorage(const FlutterSecureStorage());
+});
+
+// Current employee ID provider for real-time access
+final currentEmployeeIdProvider = StateProvider<String?>((ref) => null);
+
 final tasksProvider = FutureProvider<List<dynamic>>((ref) async {
-  return ref.watch(taskRepositoryProvider).getTasks();
+  final storage = ref.watch(secureStorageProvider);
+  final employeeId = await storage.readEmployeeId();
+
+  if (employeeId == null) {
+    throw Exception('Employee ID not found. Please login again.');
+  }
+
+  // Store employee ID in provider for real-time access
+  ref.read(currentEmployeeIdProvider.notifier).state = employeeId;
+
+  return ref.watch(taskRepositoryProvider).getTasksForEmployee(int.parse(employeeId));
 });
 
 // Phase-5: Task animation state provider
@@ -179,6 +198,23 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
     
     state = finalTasks;
   }
+
+  // Update task status for real-time updates
+  void updateTaskStatus(String taskId, String status) {
+    final taskIndex = state.indexWhere((taskWithDistance) => 
+        taskWithDistance.task['id']?.toString() == taskId);
+    
+    if (taskIndex != -1) {
+      final updatedTaskWithDistance = state[taskIndex].copyWith(
+        task: Map<String, dynamic>.from(state[taskIndex].task)
+          ..['status'] = status,
+      );
+      
+      final newState = List<TaskWithDistance>.from(state);
+      newState[taskIndex] = updatedTaskWithDistance;
+      state = newState;
+    }
+  }
 }
 
 final tasksWithDistanceProvider = StateNotifierProvider<TaskWithDistanceNotifier, List<TaskWithDistance>>((ref) {
@@ -237,22 +273,26 @@ class RealTimeTaskNotifier extends StateNotifier<List<Map<String, dynamic>>> {
   void _handleTaskEvent(Map<String, dynamic> event) {
     final taskId = event['taskId']?.toString();
     final status = event['status'];
+    final assignedToEmployeeId = event['assignedToEmployeeId']?.toString();
     
     if (taskId != null && status != null) {
-      // Phase-4: Update in-memory state without API calls
-      final taskIndex = state.indexWhere((task) => task['id']?.toString() == taskId);
+      // Guard against null assignedToEmployeeId
+      if (assignedToEmployeeId == null) return;
       
-      if (taskIndex != -1) {
-        final updatedTask = Map<String, dynamic>.from(state[taskIndex]);
-        updatedTask['status'] = status;
-        
-        final newState = List<Map<String, dynamic>>.from(state);
-        newState[taskIndex] = updatedTask;
-        state = newState;
-        
-        // Phase-5: Trigger animation
-        _ref.read(taskAnimationProvider.notifier).triggerAnimation(taskId, 'status_change');
+      // Get current logged-in employee ID from provider (sync)
+      final currentEmployeeId = _ref.read(currentEmployeeIdProvider);
+      
+      // Skip updates for tasks not assigned to current employee
+      if (currentEmployeeId != null && 
+          assignedToEmployeeId != currentEmployeeId) {
+        return; // Ignore updates for other employees' tasks
       }
+      
+      // Phase-4: Update TaskWithDistance state
+      _ref.read(tasksWithDistanceProvider.notifier).updateTaskStatus(taskId, status);
+      
+      // Phase-5: Trigger animation
+      _ref.read(taskAnimationProvider.notifier).triggerAnimation(taskId, 'status_change');
     }
   }
 

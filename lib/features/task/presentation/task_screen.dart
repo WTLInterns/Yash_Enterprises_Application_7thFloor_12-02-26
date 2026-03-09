@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../address/presentation/address_edit_request_screen.dart';
 import 'providers/task_providers.dart';
 import '../data/repository/task_repository.dart';
 import '../../../../core/storage/storage_providers.dart';
@@ -18,11 +19,14 @@ class TaskScreen extends ConsumerStatefulWidget {
 class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _search = TextEditingController();
   bool _isListeningStarted = false;
-  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   @override
   void initState() {
     super.initState();
+    ref.read(tasksProvider.future).then((items) {
+      final tasksList = items.cast<Map<String, dynamic>>();
+      ref.read(tasksWithDistanceProvider.notifier).loadCustomerAddresses(tasksList);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isListeningStarted) {
         _isListeningStarted = true;
@@ -35,6 +39,30 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  void _navigateToAddressEdit(BuildContext context, TaskWithDistance taskWithDistance) {
+    final address = taskWithDistance.customerAddress;
+    
+    // Safe navigation with null checks
+    if (address == null || address['id'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Customer address not available')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddressEditRequestScreen(
+          addressId: address['id'] as int,
+          currentAddress: address['address'] ?? '',
+          currentLatitude: (address['latitude'] ?? 0).toDouble(),
+          currentLongitude: (address['longitude'] ?? 0).toDouble(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -85,6 +113,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'task_screen_fab',
         onPressed: () {},
         backgroundColor: cs.primary,
         child: const Icon(Icons.add),
@@ -177,12 +206,6 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 loading: () => _buildLoadingState(),
                 error: (e, _) => _buildErrorState(e),
                 data: (items) {
-                  // Load customer addresses when tasks are loaded
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    final tasksList = items.map((e) => e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{}).toList();
-                    ref.read(tasksWithDistanceProvider.notifier).loadCustomerAddresses(tasksList);
-                  });
-
                   final tasksWithDistance = ref.watch(tasksWithDistanceProvider);
                   
                   final q = _search.text.trim().toLowerCase();
@@ -194,10 +217,9 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                           return (title + client).toLowerCase().contains(q);
                         }).toList();
 
-                  return AnimatedList(
-                    key: _listKey,
-                    initialItemCount: filtered.length,
-                    itemBuilder: (context, index, animation) {
+                  return ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
                       final taskWithDistance = filtered[index];
                       final task = taskWithDistance.task;
 
@@ -216,27 +238,22 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                           ? Colors.green.shade700
                           : Colors.orange.shade800;
 
-                      return SizeTransition(
-                        sizeFactor: animation,
-                        child: FadeTransition(
-                          opacity: animation,
-                          child: AnimatedTaskCard(
-                            taskWithDistance: taskWithDistance,
-                            task: task,
-                            title: title,
-                            assignedBy: assignedBy,
-                            status: status,
-                            date: date,
-                            time: time,
-                            time2: time2,
-                            assignee: assignee,
-                            statusBg: statusBg,
-                            statusFg: statusFg,
-                            cs: cs,
-                            onUpdateTask: () => _showUpdateTaskDialog(context, task),
-                            onLocationRestriction: () => _showLocationRestrictionDialog(context, taskWithDistance),
-                          ),
-                        ),
+                      return AnimatedTaskCard(
+                        taskWithDistance: taskWithDistance,
+                        task: task,
+                        title: title,
+                        assignedBy: assignedBy,
+                        status: status,
+                        date: date,
+                        time: time,
+                        time2: time2,
+                        assignee: assignee,
+                        statusBg: statusBg,
+                        statusFg: statusFg,
+                        cs: cs,
+                        onUpdateTask: () => _showUpdateTaskDialog(context, task),
+                        onLocationRestriction: () => _showLocationRestrictionDialog(context, taskWithDistance),
+                        onAddressEdit: () => _navigateToAddressEdit(context, taskWithDistance),
                       );
                     },
                   );
@@ -600,6 +617,7 @@ class AnimatedTaskCard extends ConsumerWidget {
     required this.cs,
     required this.onUpdateTask,
     required this.onLocationRestriction,
+    required this.onAddressEdit,
   });
 
   final TaskWithDistance taskWithDistance;
@@ -616,6 +634,7 @@ class AnimatedTaskCard extends ConsumerWidget {
   final ColorScheme cs;
   final VoidCallback onUpdateTask;
   final VoidCallback onLocationRestriction;
+  final VoidCallback onAddressEdit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -893,7 +912,51 @@ class AnimatedTaskCard extends ConsumerWidget {
                   ),
                 ),
               ],
-              // Location status message with animation
+              // Request Address Change button
+              if (taskWithDistance.customerAddress != null) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      final address = taskWithDistance.customerAddress;
+                        
+                      // Safe navigation with null checks
+                      if (address == null || address['id'] == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Customer address not available')),
+                        );
+                        return;
+                      }
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddressEditRequestScreen(
+                            addressId: address['id'] as int,
+                            currentAddress: address['address'] ?? '',
+                            currentLatitude: (address['latitude'] ?? 0).toDouble(),
+                            currentLongitude: (address['longitude'] ?? 0).toDouble(),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.edit_location, size: 18, color: Colors.orange.shade600),
+                    label: Text(
+                      'Request Address Change',
+                      style: TextStyle(color: Colors.orange.shade600, fontWeight: FontWeight.w600),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      backgroundColor: Colors.orange.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(color: Colors.orange.shade200),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               if (taskWithDistance.distanceToCustomer != null) ...[
                 const SizedBox(height: 8),
                 AnimatedContainer(

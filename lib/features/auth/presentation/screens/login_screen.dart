@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../core/notifications/fcm_providers.dart';
+import '../../../../core/storage/storage_providers.dart';
 import '../../../../core/utils/ui_feedback.dart';
+import '../../../../features/task/presentation/providers/task_providers.dart';
 import '../providers/auth_providers.dart';
 import '../providers/session_provider.dart';
 
@@ -62,6 +64,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
       await ref.read(sessionProvider).refresh();
       await ref.read(fcmTokenSyncProvider).sync();
+      
+      // Set employee ID for real-time filtering from secure storage
+      final storage = ref.read(secureStorageProvider);
+      final employeeId = await storage.readEmployeeId();
+      if (employeeId != null) {
+        ref.read(currentEmployeeIdProvider.notifier).state = employeeId;
+      }
+      
       if (mounted) context.go(RouteNames.shell);
     } on DioException catch (e) {
       final msg = e.response?.data?.toString() ?? e.message ?? "Network error";

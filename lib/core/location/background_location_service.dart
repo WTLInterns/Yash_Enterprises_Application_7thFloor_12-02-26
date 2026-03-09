@@ -7,6 +7,7 @@ import 'package:workmanager/workmanager.dart' as workmanager;
 import 'package:background_fetch/background_fetch.dart' as bg;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:dio/dio.dart';
+import '../config/app_config.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -18,7 +19,15 @@ class BackgroundLocationService {
   BackgroundLocationService._internal();
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: '${AppConfig.baseUrl}/api',
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
+      headers: {'Accept': 'application/json'},
+    ),
+  );
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   
   bool _isInitialized = false;
@@ -226,7 +235,7 @@ class BackgroundLocationService {
 
   Future<void> _sendLocationToServer(Position position) async {
     try {
-      final employeeId = await _storage.read(key: 'employeeId');
+      final employeeId = await _storage.read(key: 'employee_id');
       final token = await _storage.read(key: 'auth_token');
 
       if (employeeId == null || token == null) {
@@ -235,7 +244,7 @@ class BackgroundLocationService {
       }
 
       final response = await _dio.post(
-        'http://192.168.1.102:8080/api/employee-locations/$employeeId/location',
+        '/employee-locations/$employeeId/location',
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
@@ -284,7 +293,7 @@ class BackgroundLocationService {
 
       // Send notification to admin
       await _dio.post(
-        'http://192.168.1.102:8080/api/notifications/idle-alert',
+        'http://192.168.1.100:8080/api/notifications/idle-alert',
         options: Options(
           headers: {
             'Authorization': 'Bearer ${await _storage.read(key: 'auth_token')}',

@@ -22,6 +22,11 @@ final punchEventsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   return webSocketService.punchEvents;
 });
 
+final adminNotificationEventsProvider = StreamProvider<Map<String, dynamic>>((ref) {
+  final webSocketService = ref.watch(webSocketServiceProvider);
+  return webSocketService.adminNotificationStream;
+});
+
 // Connection status provider
 final webSocketConnectionProvider = Provider<bool>((ref) {
   final webSocketService = ref.watch(webSocketServiceProvider);
