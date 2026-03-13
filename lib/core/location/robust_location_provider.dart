@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'robust_location_service.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../tracking/background_tracking_service.dart';
+import 'robustbg_location_service.dart';
 
 class RobustLocationTrackingState {
   final bool isInitialized;
@@ -45,72 +48,71 @@ class RobustLocationTrackingState {
   }
 }
 
-class RobustLocationTrackingNotifier extends StateNotifier<RobustLocationTrackingState> {
-  final RobustLocationService _service;
-
-  RobustLocationTrackingNotifier(this._service) : super(RobustLocationTrackingState());
+class RobustLocationTrackingNotifier
+    extends StateNotifier<RobustLocationTrackingState> {
+  RobustLocationTrackingNotifier() : super(RobustLocationTrackingState());
 
   Future<void> initialize() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.initialize();
-      state = state.copyWith(
-        isInitialized: true,
-        isLoading: false,
-      );
+      await RobustBgLocationService.instance.initialize();
+      state = state.copyWith(isInitialized: true, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> startTracking() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.startTracking();
-      state = state.copyWith(
-        isTracking: true,
-        isLoading: false,
+      await BackgroundTrackingService.start();
+      await RobustBgLocationService.instance.tick(
+        trigger: RobustBgTickTrigger.manual,
       );
+      state = state.copyWith(isTracking: true, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> stopTracking() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.stopTracking();
-      state = state.copyWith(
-        isTracking: false,
-        isLoading: false,
-      );
+      await BackgroundTrackingService.stop();
+      state = state.copyWith(isTracking: false, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> updateStatus() async {
     try {
-      final status = _service.getTrackingStatus();
+      Map<String, dynamic>? lastKnown;
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        );
+        lastKnown = {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'accuracy': position.accuracy,
+          'speed': position.speed,
+          'heading': position.heading,
+        };
+      } catch (_) {
+        lastKnown = state.lastKnownPosition;
+      }
       state = state.copyWith(
-        isInitialized: status['isInitialized'] ?? false,
-        isTracking: status['isTracking'] ?? false,
-        lastKnownPosition: status['lastKnownPosition'],
-        lastUpdateTime: status['lastUpdateTime'],
-        consecutiveFailures: status['consecutiveFailures'] ?? 0,
-        trackingMethod: status['trackingMethod'] ?? 'robust_background',
+        isInitialized: true,
+        isTracking: state.isTracking,
+        lastKnownPosition: lastKnown,
+        lastUpdateTime: DateTime.now().toIso8601String(),
+        consecutiveFailures: state.consecutiveFailures,
+        trackingMethod: 'robustbg_engine',
       );
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -123,11 +125,10 @@ class RobustLocationTrackingNotifier extends StateNotifier<RobustLocationTrackin
 }
 
 // Provider
-final robustLocationTrackingServiceProvider = Provider<RobustLocationService>((ref) {
-  return RobustLocationService();
-});
-
-final robustLocationTrackingProvider = StateNotifierProvider<RobustLocationTrackingNotifier, RobustLocationTrackingState>((ref) {
-  final service = ref.watch(robustLocationTrackingServiceProvider);
-  return RobustLocationTrackingNotifier(service);
-});
+final robustLocationTrackingProvider =
+    StateNotifierProvider<
+      RobustLocationTrackingNotifier,
+      RobustLocationTrackingState
+    >((ref) {
+      return RobustLocationTrackingNotifier();
+    });

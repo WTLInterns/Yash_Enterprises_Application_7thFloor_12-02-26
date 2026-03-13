@@ -1,48 +1,77 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import '../storage/storage_providers.dart';
 
-final dioProvider = Provider<Dio>((ref) {
+Dio createConfiguredDio({
+  required Future<String?> Function() readToken,
+  Future<void> Function()? onUnauthorized,
+}) {
   final dio = Dio(
     BaseOptions(
-      baseUrl: '${AppConfig.baseUrl}/api',
+      baseUrl: AppConfig.apiUrl,
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 30),
       sendTimeout: const Duration(seconds: 30),
-      headers: {'Accept': 'application/json'},
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
     ),
   );
 
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
-        print('🌐 Dio Request: ${options.method} ${options.path}');
-        if (options.data != null) {
-          print('🌐 Dio Data: ${options.data}');
+        if (kDebugMode) {
+          print('🌐 Dio Request: ${options.method} ${options.path}');
+          if (options.data != null) {
+            print('🌐 Dio Data: ${options.data}');
+          }
         }
-        final token = await ref.read(secureSessionStorageProvider).readToken();
+
+        final token = await readToken();
         if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
+
         handler.next(options);
       },
+
       onResponse: (response, handler) {
-        print('🌐 Dio Response: ${response.statusCode} ${response.requestOptions.path}');
+        if (kDebugMode) {
+          print(
+            '🌐 Dio Response: ${response.statusCode} ${response.requestOptions.path}',
+          );
+        }
         handler.next(response);
       },
+
       onError: (e, handler) async {
-        print('🌐 Dio Error: ${e.response?.statusCode} ${e.requestOptions.path}');
-        print('🌐 Dio Error Body: ${e.response?.data}');
-        // If backend returns 401, session is invalid.
-        if (e.response?.statusCode == 401) {
-          await ref.read(secureSessionStorageProvider).clear();
+        if (kDebugMode) {
+          print(
+            '🌐 Dio Error: ${e.response?.statusCode} ${e.requestOptions.path}',
+          );
+          print('🌐 Dio Error Body: ${e.response?.data}');
         }
+
+        if (e.response?.statusCode == 401) {
+          await onUnauthorized?.call();
+        }
+
         handler.next(e);
       },
     ),
   );
 
   return dio;
+}
+
+final dioProvider = Provider<Dio>((ref) {
+  return createConfiguredDio(
+    readToken: () => ref.read(secureSessionStorageProvider).readToken(),
+    onUnauthorized: () => ref.read(secureSessionStorageProvider).clear(),
+  );
 });

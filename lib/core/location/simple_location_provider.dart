@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'simple_location_service.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../tracking/background_tracking_service.dart';
+import 'robustbg_location_service.dart';
 
 class SimpleLocationTrackingState {
   final bool isTracking;
@@ -37,70 +40,90 @@ class SimpleLocationTrackingState {
   }
 }
 
-class SimpleLocationTrackingNotifier extends StateNotifier<SimpleLocationTrackingState> {
-  final SimpleLocationService _service;
-
-  SimpleLocationTrackingNotifier(this._service) : super(SimpleLocationTrackingState());
+class SimpleLocationTrackingNotifier
+    extends StateNotifier<SimpleLocationTrackingState> {
+  SimpleLocationTrackingNotifier() : super(SimpleLocationTrackingState());
 
   Future<void> initialize() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.initialize();
+      await RobustBgLocationService.instance.initialize();
+      Map<String, dynamic>? lastKnown;
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        );
+        lastKnown = {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'accuracy': position.accuracy,
+          'speed': position.speed,
+          'heading': position.heading,
+        };
+      } catch (_) {
+        lastKnown = null;
+      }
       state = state.copyWith(
         isInitialized: true,
+        lastKnownPosition: lastKnown,
+        lastUpdateTime: DateTime.now().toIso8601String(),
         isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> startTracking() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.startTracking();
-      state = state.copyWith(
-        isTracking: true,
-        isLoading: false,
+      await BackgroundTrackingService.start();
+      await RobustBgLocationService.instance.tick(
+        trigger: RobustBgTickTrigger.manual,
       );
+      state = state.copyWith(isTracking: true, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> stopTracking() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.stopTracking();
-      state = state.copyWith(
-        isTracking: false,
-        isLoading: false,
-      );
+      await BackgroundTrackingService.stop();
+      state = state.copyWith(isTracking: false, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> updateStatus() async {
     try {
-      final status = _service.getTrackingStatus();
+      Map<String, dynamic>? lastKnown;
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        );
+        lastKnown = {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'accuracy': position.accuracy,
+          'speed': position.speed,
+          'heading': position.heading,
+        };
+      } catch (_) {
+        lastKnown = state.lastKnownPosition;
+      }
       state = state.copyWith(
         isInitialized: state.isInitialized,
-        isTracking: status['isTracking'] ?? false,
-        lastKnownPosition: status['lastKnownPosition'],
-        lastUpdateTime: status['lastUpdateTime'],
+        isTracking: state.isTracking,
+        lastKnownPosition: lastKnown,
+        lastUpdateTime: DateTime.now().toIso8601String(),
       );
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -113,11 +136,10 @@ class SimpleLocationTrackingNotifier extends StateNotifier<SimpleLocationTrackin
 }
 
 // Provider
-final simpleLocationTrackingServiceProvider = Provider<SimpleLocationService>((ref) {
-  return SimpleLocationService();
-});
-
-final simpleLocationTrackingProvider = StateNotifierProvider<SimpleLocationTrackingNotifier, SimpleLocationTrackingState>((ref) {
-  final service = ref.watch(simpleLocationTrackingServiceProvider);
-  return SimpleLocationTrackingNotifier(service);
-});
+final simpleLocationTrackingProvider =
+    StateNotifierProvider<
+      SimpleLocationTrackingNotifier,
+      SimpleLocationTrackingState
+    >((ref) {
+      return SimpleLocationTrackingNotifier();
+    });

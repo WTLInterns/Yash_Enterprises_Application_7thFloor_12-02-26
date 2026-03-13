@@ -57,21 +57,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      await ref.read(authRepositoryProvider).login(
-            organization: organization,
-            email: email,
-            password: password,
-          );
+      await ref
+          .read(authRepositoryProvider)
+          .login(organization: organization, email: email, password: password);
       await ref.read(sessionProvider).refresh();
       await ref.read(fcmTokenSyncProvider).sync();
-      
+
       // Set employee ID for real-time filtering from secure storage
       final storage = ref.read(secureStorageProvider);
       final employeeId = await storage.readEmployeeId();
       if (employeeId != null) {
         ref.read(currentEmployeeIdProvider.notifier).state = employeeId;
       }
-      
+
       if (mounted) context.go(RouteNames.shell);
     } on DioException catch (e) {
       final msg = e.response?.data?.toString() ?? e.message ?? "Network error";
@@ -89,11 +87,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFE7F6FF),
-            Color(0xFFF2E9FF),
-            Color(0xFFFFFFFF),
-          ],
+          colors: [Color(0xFFE7F6FF), Color(0xFFF2E9FF), Color(0xFFFFFFFF)],
         ),
       ),
     );
@@ -107,7 +101,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           height: 40,
           width: 40,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF2F6BFF), Color(0xFFB14DFF)]),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF2F6BFF), Color(0xFFB14DFF)],
+            ),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
@@ -132,6 +128,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  Widget _inputField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+    Widget? suffix,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      height: 65,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE4E7EF)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscure,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(icon, color: const Color(0xFF2F6BFF)),
+          suffixIcon: suffix,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 18),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,202 +172,117 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           _bg(),
           SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 22, 18, 12),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 18),
-                    _logoRow(),
-                    const SizedBox(height: 22),
-                    const Text(
-                      'Login to account',
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 22),
-                    
-                    // Organization Field
-                    Focus(
-                      onFocusChange: (hasFocus) => setState(() => _organizationFocused = hasFocus),
-                      child: Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _organizationFocused 
-                                ? const Color(0xFF2F6BFF)
-                                : const Color(0xFFE7EAF3),
-                            width: _organizationFocused ? 2 : 1,
+            child: Center(
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 20),
+                        _logoRow(),
+                        const SizedBox(height: 30),
+                        const Text(
+                          "Login to account",
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
                           ),
-                          boxShadow: _organizationFocused
-                              ? [
-                                  BoxShadow(
-                                    color: const Color(0xFF2F6BFF).withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
                         ),
-                        child: TextField(
+                        const SizedBox(height: 28),
+
+                        /// ORGANIZATION
+                        _inputField(
                           controller: _organizationController,
-                          decoration: const InputDecoration(
-                            hintText: 'Organization',
-                            prefixIcon: Icon(Icons.business_outlined, color: Color(0xFF2F6BFF)),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                          ),
+                          hint: "Organization",
+                          icon: Icons.business_outlined,
+                          obscure: false,
                         ),
-                      ),
-                    ),
-                  const SizedBox(height: 14),
-                  
-                  // Email Field
-                  Focus(
-                    onFocusChange: (hasFocus) => setState(() => _emailFocused = hasFocus),
-                    child: Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _emailFocused 
-                              ? const Color(0xFF2F6BFF)
-                              : const Color(0xFFE7EAF3),
-                          width: _emailFocused ? 2 : 1,
+                        const SizedBox(height: 16),
+
+                        /// EMAIL
+                        _inputField(
+                          controller: _emailController,
+                          hint: "Email address",
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          obscure: false,
                         ),
-                        boxShadow: _emailFocused
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF2F6BFF).withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          hintText: 'Email Address',
-                          helperText: 'Enter your work email',
-                          prefixIcon: Icon(Icons.email_outlined, color: Color(0xFF2F6BFF)),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  
-                  // Password Field
-                  Focus(
-                    onFocusChange: (hasFocus) => setState(() => _passwordFocused = hasFocus),
-                    child: Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _passwordFocused 
-                              ? const Color(0xFF2F6BFF)
-                              : const Color(0xFFE7EAF3),
-                          width: _passwordFocused ? 2 : 1,
-                        ),
-                        boxShadow: _passwordFocused
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF2F6BFF).withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          hintText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF2F6BFF)),
-                          suffixIcon: IconButton(
+
+                        const SizedBox(height: 16),
+
+                        /// PASSWORD
+                        _inputField(
+                          controller: _passwordController,
+                          hint: "Password",
+                          icon: Icons.lock_outline,
+                          obscure: _obscurePassword,
+                          suffix: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              color: Colors.grey[600],
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
                             ),
                             onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
                             },
                           ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  
-                  // Login Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: FilledButton(
-                      style: ButtonStyle(
-                        backgroundColor: WidgetStatePropertyAll(
-                          _emailController.text.trim().isEmpty || 
-                          _passwordController.text.trim().isEmpty || 
-                          _organizationController.text.trim().isEmpty 
-                              ? const Color(0xFFE7EAF3) 
-                              : const Color(0xFF2F6BFF),
-                        ),
-                        foregroundColor: WidgetStatePropertyAll(
-                          _emailController.text.trim().isEmpty || 
-                          _passwordController.text.trim().isEmpty || 
-                          _organizationController.text.trim().isEmpty 
-                              ? const Color(0xFFB5BAC7) 
-                              : Colors.white,
-                        ),
-                        elevation: WidgetStatePropertyAll(
-                          _emailController.text.trim().isEmpty || 
-                          _passwordController.text.trim().isEmpty || 
-                          _organizationController.text.trim().isEmpty 
-                              ? 0 
-                              : 4,
-                        ),
-                        shape: WidgetStatePropertyAll(
-                          RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+
+                        const SizedBox(height: 24),
+
+                        /// LOGIN BUTTON
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF2F6BFF),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: _loading ? null : _login,
+                            child: _loading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    "Login",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
-                      ),
-                      onPressed: (_loading || 
-                               _emailController.text.trim().isEmpty || 
-                               _passwordController.text.trim().isEmpty || 
-                               _organizationController.text.trim().isEmpty) 
-                          ? null 
-                          : _login,
-                      child: _loading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                            ),
+
+                        const SizedBox(height: 40),
+
+                        const Text(
+                          "v6.57",
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Text('v6.57', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                  ),
-                ],
+                ),
               ),
-            ),
             ),
           ),
         ],

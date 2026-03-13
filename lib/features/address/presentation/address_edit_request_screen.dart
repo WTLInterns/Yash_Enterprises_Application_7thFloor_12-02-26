@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import '../../../core/config/app_config.dart';
 
 class AddressEditRequestScreen extends StatefulWidget {
   final int addressId;
@@ -20,7 +20,8 @@ class AddressEditRequestScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _AddressEditRequestScreenState createState() => _AddressEditRequestScreenState();
+  _AddressEditRequestScreenState createState() =>
+      _AddressEditRequestScreenState();
 }
 
 class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
@@ -32,7 +33,7 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
   late final TextEditingController _countryController;
   late final TextEditingController _reasonController;
   final _secureStorage = const FlutterSecureStorage();
-  
+
   // Address type selection
   String _selectedAddressType = 'PRIMARY';
 
@@ -45,7 +46,7 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
   // 🚀 Google Maps Reverse Geocoding API (Production-safe, Clean)
   Future<void> _reverseGeocodeWithGoogle(double lat, double lng) async {
     const apiKey = String.fromEnvironment('GOOGLE_MAPS_KEY');
-    
+
     final url = Uri.parse(
       'https://maps.googleapis.com/maps/api/geocode/json'
       '?latlng=$lat,$lng'
@@ -55,20 +56,21 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
 
     try {
       final res = await http.get(url);
-      
+
       if (res.statusCode != 200) return;
-      
+
       final data = jsonDecode(res.body);
       if (data['status'] != 'OK' || data['results'].isEmpty) return;
-      
+
       final result = data['results'][0];
       final components = result['address_components'] as List;
-      
+
       String get(String type) {
         return components.firstWhere(
-          (c) => (c['types'] as List).contains(type),
-          orElse: () => null,
-        )?['long_name'] ?? '';
+              (c) => (c['types'] as List).contains(type),
+              orElse: () => null,
+            )?['long_name'] ??
+            '';
       }
 
       final premise = get('premise');
@@ -84,8 +86,10 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
           subLocality,
           locality,
         ].where((e) => e.isNotEmpty).take(2).join(', ');
-        
-        _cityController.text = locality.isNotEmpty ? locality : get('administrative_area_level_2');
+
+        _cityController.text = locality.isNotEmpty
+            ? locality
+            : get('administrative_area_level_2');
         _stateController.text = get('administrative_area_level_1');
         _pincodeController.text = get('postal_code');
         _countryController.text = get('country');
@@ -121,7 +125,7 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
 
   Future<void> _getCurrentLocation() async {
     setState(() => _isGettingLocation = true);
-    
+
     try {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -140,12 +144,11 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
         // If Google API fails, at least we have coordinates
         print('Reverse geocoding failed: $e');
       }
-
     } catch (e) {
       setState(() => _isGettingLocation = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to fetch location: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to fetch location: $e')));
     } finally {
       setState(() => _isGettingLocation = false);
     }
@@ -173,10 +176,10 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
       }
 
       final response = await http.post(
-        Uri.parse('http://192.168.1.100:8080/api/customer-address-edit-requests?employeeId=$employeeId'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        Uri.parse(
+          '${AppConfig.apiBaseUrl}/api/customer-address-edit-requests?employeeId=$employeeId',
+        ),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'addressId': widget.addressId,
           'addressType': _selectedAddressType,
@@ -194,14 +197,14 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() => _requestStatus = 'PENDING');
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(data['message'] ?? 'Request submitted successfully'),
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Auto-refresh after 30 seconds
         _refreshStatus();
       } else {
@@ -210,10 +213,7 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() => _isLoading = false);
@@ -275,7 +275,10 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                     children: [
                       const Text(
                         'Current Address',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(widget.currentAddress),
@@ -288,17 +291,17 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // New Address Form
               const Text(
                 'Proposed New Address',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               TextFormField(
                 controller: _addressLineController,
                 decoration: const InputDecoration(
@@ -312,9 +315,9 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Address Type Selection
               DropdownButtonFormField<String>(
                 value: _selectedAddressType,
@@ -324,10 +327,22 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   prefixIcon: Icon(Icons.location_city, color: Colors.grey),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'PRIMARY', child: Text('Primary Address')),
-                  DropdownMenuItem(value: 'POLICE', child: Text('Police Address')),
-                  DropdownMenuItem(value: 'POST', child: Text('Post Office Address')),
-                  DropdownMenuItem(value: 'TAHSIL', child: Text('Tahsil Address')),
+                  DropdownMenuItem(
+                    value: 'PRIMARY',
+                    child: Text('Primary Address'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'POLICE',
+                    child: Text('Police Address'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'POST',
+                    child: Text('Post Office Address'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'TAHSIL',
+                    child: Text('Tahsil Address'),
+                  ),
                 ],
                 onChanged: (value) {
                   if (value != null) {
@@ -335,9 +350,9 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   }
                 },
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -373,9 +388,9 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -405,9 +420,9 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Location Capture
               Card(
                 child: Padding(
@@ -452,15 +467,16 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               TextFormField(
                 controller: _reasonController,
                 decoration: const InputDecoration(
                   labelText: 'Reason for Change',
                   border: OutlineInputBorder(),
-                  hintText: 'e.g., Client shifted to new location, Address correction needed...',
+                  hintText:
+                      'e.g., Client shifted to new location, Address correction needed...',
                 ),
                 maxLines: 3,
                 validator: (value) {
@@ -470,9 +486,9 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
                   return null;
                 },
               ),
-              
+
               const SizedBox(height: 32),
-              
+
               // Submit Button
               SizedBox(
                 width: double.infinity,

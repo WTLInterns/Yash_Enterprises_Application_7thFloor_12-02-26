@@ -14,15 +14,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final session = ref.watch(sessionProvider);
 
   return GoRouter(
-    initialLocation: RouteNames.language,
+    initialLocation: RouteNames.login,
     refreshListenable: session,
     redirect: (context, state) {
       // Only redirect if session is initialized
       if (!session.initialized) return null;
-      
+
       final loggedIn = session.isLoggedIn;
       final goingToLogin = state.matchedLocation == RouteNames.login;
-      final goingToOnboarding = state.matchedLocation == RouteNames.language ||
+      final goingToOnboarding =
+          // state.matchedLocation == RouteNames.language ||
           state.matchedLocation == RouteNames.permissions;
 
       if (!loggedIn) {
@@ -36,10 +37,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: RouteNames.language,
-        builder: (context, state) => const LanguageScreen(),
-      ),
+      // GoRoute(
+      //   path: RouteNames.language,
+      //   builder: (context, state) => const LanguageScreen(),
+      // ),
       GoRoute(
         path: RouteNames.permissions,
         builder: (context, state) => const PermissionsScreen(),

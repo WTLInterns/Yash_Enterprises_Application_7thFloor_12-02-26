@@ -7,7 +7,6 @@ import '../data/repository/task_repository.dart';
 import '../../../../core/storage/storage_providers.dart';
 import '../../../../core/utils/distance_calculator.dart';
 import '../../../../core/location/location_provider.dart';
-import '../../../../core/location/simple_location_service.dart';
 
 class TaskScreen extends ConsumerStatefulWidget {
   const TaskScreen({super.key});
@@ -25,7 +24,9 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     super.initState();
     ref.read(tasksProvider.future).then((items) {
       final tasksList = items.cast<Map<String, dynamic>>();
-      ref.read(tasksWithDistanceProvider.notifier).loadCustomerAddresses(tasksList);
+      ref
+          .read(tasksWithDistanceProvider.notifier)
+          .loadCustomerAddresses(tasksList);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isListeningStarted) {
@@ -41,9 +42,12 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     super.dispose();
   }
 
-  void _navigateToAddressEdit(BuildContext context, TaskWithDistance taskWithDistance) {
+  void _navigateToAddressEdit(
+    BuildContext context,
+    TaskWithDistance taskWithDistance,
+  ) {
     final address = taskWithDistance.customerAddress;
-    
+
     // Safe navigation with null checks
     if (address == null || address['id'] == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,7 +94,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                       color: cs.primary,
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Icon(Icons.list_alt, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.list_alt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -104,7 +112,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Icon(Icons.location_on_outlined, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.location_on_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ],
@@ -142,7 +154,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                   const Expanded(
                     child: Text(
                       'How to Edit/Add Clients [Updated] -\nWatch Quick Video Guide.',
-                      style: TextStyle(color: Color(0xFF2F6FED), fontWeight: FontWeight.w600, height: 1.15),
+                      style: TextStyle(
+                        color: Color(0xFF2F6FED),
+                        fontWeight: FontWeight.w600,
+                        height: 1.15,
+                      ),
                     ),
                   ),
                   const Icon(Icons.play_circle_outline, color: Colors.red),
@@ -154,18 +170,27 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
               children: [
                 const Icon(Icons.calendar_month),
                 const SizedBox(width: 6),
-                const Text('Today', style: TextStyle(fontWeight: FontWeight.w800)),
+                const Text(
+                  'Today',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(width: 4),
                 const Icon(Icons.keyboard_arrow_down),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.black.withOpacity(0.08)),
                   ),
-                  child: const Text('1 Task', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    '1 Task',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             ),
@@ -187,7 +212,12 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 const SizedBox(width: 10),
                 _iconBtn(Icons.tune),
                 const SizedBox(width: 10),
-                _iconBtn(Icons.refresh, onTap: () => ref.read(realTimeTaskNotifierProvider.notifier).startListening())
+                _iconBtn(
+                  Icons.refresh,
+                  onTap: () => ref
+                      .read(realTimeTaskNotifierProvider.notifier)
+                      .startListening(),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -195,9 +225,16 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
               children: [
                 const Icon(Icons.sort, size: 18),
                 const SizedBox(width: 8),
-                const Text('Desc', style: TextStyle(fontWeight: FontWeight.w700)),
+                const Text(
+                  'Desc',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(width: 10),
-                Container(height: 18, width: 1, color: Colors.black.withOpacity(0.18)),
+                Container(
+                  height: 18,
+                  width: 1,
+                  color: Colors.black.withOpacity(0.18),
+                ),
               ],
             ),
             const SizedBox(height: 14),
@@ -206,14 +243,19 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 loading: () => _buildLoadingState(),
                 error: (e, _) => _buildErrorState(e),
                 data: (items) {
-                  final tasksWithDistance = ref.watch(tasksWithDistanceProvider);
-                  
+                  final tasksWithDistance = ref.watch(
+                    tasksWithDistanceProvider,
+                  );
+
                   final q = _search.text.trim().toLowerCase();
                   final filtered = q.isEmpty
                       ? tasksWithDistance
                       : tasksWithDistance.where((e) {
-                          final title = (e.task['title'] ?? e.task['name'] ?? '').toString();
-                          final client = (e.task['clientName'] ?? '').toString();
+                          final title =
+                              (e.task['title'] ?? e.task['name'] ?? '')
+                                  .toString();
+                          final client = (e.task['clientName'] ?? '')
+                              .toString();
                           return (title + client).toLowerCase().contains(q);
                         }).toList();
 
@@ -223,13 +265,18 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                       final taskWithDistance = filtered[index];
                       final task = taskWithDistance.task;
 
-                      final title = (task['title'] ?? task['name'] ?? 'Task').toString();
-                      final assignedBy = (task['createdByEmployeeName'] ?? 'Admin Assigned').toString();
+                      final title = (task['title'] ?? task['name'] ?? 'Task')
+                          .toString();
+                      final assignedBy =
+                          (task['createdByEmployeeName'] ?? 'Admin Assigned')
+                              .toString();
                       final status = (task['status'] ?? 'Pending').toString();
-                      final date = (task['startDate'] ?? task['taskDate'] ?? '').toString();
+                      final date = (task['startDate'] ?? task['taskDate'] ?? '')
+                          .toString();
                       final time = (task['startTime'] ?? '').toString();
                       final time2 = (task['endTime'] ?? '').toString();
-                      final assignee = (task['assignedToEmployeeName'] ?? '').toString();
+                      final assignee = (task['assignedToEmployeeName'] ?? '')
+                          .toString();
 
                       final statusBg = status.toLowerCase().contains('complete')
                           ? Colors.green.withOpacity(0.12)
@@ -251,9 +298,15 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                         statusBg: statusBg,
                         statusFg: statusFg,
                         cs: cs,
-                        onUpdateTask: () => _showUpdateTaskDialog(context, task),
-                        onLocationRestriction: () => _showLocationRestrictionDialog(context, taskWithDistance),
-                        onAddressEdit: () => _navigateToAddressEdit(context, taskWithDistance),
+                        onUpdateTask: () =>
+                            _showUpdateTaskDialog(context, task),
+                        onLocationRestriction: () =>
+                            _showLocationRestrictionDialog(
+                              context,
+                              taskWithDistance,
+                            ),
+                        onAddressEdit: () =>
+                            _navigateToAddressEdit(context, taskWithDistance),
                       );
                     },
                   );
@@ -270,10 +323,13 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     return Column(
       children: [
         const SizedBox(height: 20),
-        ...List.generate(3, (index) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildTaskSkeleton(),
-        )),
+        ...List.generate(
+          3,
+          (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildTaskSkeleton(),
+          ),
+        ),
       ],
     );
   }
@@ -323,7 +379,11 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
       child: ShaderMask(
         shaderCallback: (bounds) {
           return LinearGradient(
-            colors: [Colors.grey.shade300, Colors.grey.shade100, Colors.grey.shade300],
+            colors: [
+              Colors.grey.shade300,
+              Colors.grey.shade100,
+              Colors.grey.shade300,
+            ],
             stops: [0.0, 0.5, 1.0],
             tileMode: TileMode.clamp,
           ).createShader(bounds);
@@ -345,11 +405,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red.shade300,
-          ),
+          Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
           const SizedBox(height: 16),
           Text(
             'Failed to load tasks',
@@ -362,14 +418,13 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
           const SizedBox(height: 8),
           Text(
             'Please check your connection and try again',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => ref.read(realTimeTaskNotifierProvider.notifier).startListening(),
+            onPressed: () => ref
+                .read(realTimeTaskNotifierProvider.notifier)
+                .startListening(),
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
             style: ElevatedButton.styleFrom(
@@ -384,24 +439,26 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   }
 
   void _showUpdateTaskDialog(BuildContext context, Map<String, dynamic> task) {
-    final statusController = TextEditingController(text: task['status'] ?? 'INQUIRY');
+    final statusController = TextEditingController(
+      text: task['status'] ?? 'INQUIRY',
+    );
     final titleController = TextEditingController(text: task['title'] ?? '');
     String selectedStatus = task['status'] ?? 'INQUIRY';
-    
+
     // Backend enum values - must match exactly
     final statusOptions = [
       'INQUIRY',
-      'IN_PROGRESS', 
+      'IN_PROGRESS',
       'COMPLETED',
       'DELAYED',
-      'CANCELLED'
+      'CANCELLED',
     ];
-    
+
     // Ensure current status is in the list, add if not present
     if (!statusOptions.contains(selectedStatus)) {
       statusOptions.add(selectedStatus);
     }
-    
+
     showDialog(
       context: context,
       builder: (context) => ConstrainedBox(
@@ -427,7 +484,10 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                         maxLines: 2,
                       ),
                       const SizedBox(height: 16),
-                      const Text('Status:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Status:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
                       DropdownButton<String>(
                         value: selectedStatus,
@@ -435,7 +495,10 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                         items: statusOptions.map((status) {
                           return DropdownMenuItem(
                             value: status,
-                            child: Text(status, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              status,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -459,78 +522,92 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-              try {
-                // Get current employee ID from session
-                final storage = ref.read(secureSessionStorageProvider);
-                final employeeIdStr = await storage.readEmployeeId();
-                final currentEmployeeId = employeeIdStr != null ? int.tryParse(employeeIdStr) ?? 1 : 1;
-                
-                // Get current location from existing provider
-                final locationState = ref.read(locationTrackingProvider);
-                final currentPosition = locationState.currentPosition;
-                
-                if (currentPosition == null) {
-                  throw Exception('Location not available. Please enable GPS.');
-                }
-                
-                final latitude = currentPosition['latitude'] as double?;
-                final longitude = currentPosition['longitude'] as double?;
-                
-                if (latitude == null || longitude == null) {
-                  throw Exception('Invalid location data.');
-                }
-                
-                await ref.read(taskRepositoryProvider).updateTaskStatus(
-                  task['id'],
-                  selectedStatus,
-                  currentEmployeeId,
-                  latitude: latitude,
-                  longitude: longitude,
-                );
-                
-                // Refresh tasks
-                await ref.read(tasksProvider.future);
-                
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Task status updated successfully!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  String errorMessage = 'Failed to update task';
-                  
-                  // Handle backend location restriction error
-                  if (e.toString().contains('LOCATION_RESTRICTION')) {
-                    errorMessage = 'Task update blocked - You are outside the 200m customer area';
-                  } else if (e.toString().contains('MISSING_LOCATION')) {
-                    errorMessage = 'Location information required for task update';
-                  } else if (e.toString().contains('Location not available')) {
-                    errorMessage = 'GPS location required. Please enable location services.';
+                try {
+                  // Get current employee ID from session
+                  final storage = ref.read(secureSessionStorageProvider);
+                  final employeeIdStr = await storage.readEmployeeId();
+                  final currentEmployeeId = employeeIdStr != null
+                      ? int.tryParse(employeeIdStr) ?? 1
+                      : 1;
+
+                  // Get current location from existing provider
+                  final locationState = ref.read(locationTrackingProvider);
+                  final currentPosition = locationState.currentPosition;
+
+                  if (currentPosition == null) {
+                    throw Exception(
+                      'Location not available. Please enable GPS.',
+                    );
                   }
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(errorMessage),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+
+                  final latitude = currentPosition['latitude'] as double?;
+                  final longitude = currentPosition['longitude'] as double?;
+
+                  if (latitude == null || longitude == null) {
+                    throw Exception('Invalid location data.');
+                  }
+
+                  await ref
+                      .read(taskRepositoryProvider)
+                      .updateTaskStatus(
+                        task['id'],
+                        selectedStatus,
+                        currentEmployeeId,
+                        latitude: latitude,
+                        longitude: longitude,
+                      );
+
+                  // Refresh tasks
+                  await ref.read(tasksProvider.future);
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Task status updated successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    String errorMessage = 'Failed to update task';
+
+                    // Handle backend location restriction error
+                    if (e.toString().contains('LOCATION_RESTRICTION')) {
+                      errorMessage =
+                          'Task update blocked - You are outside the 200m customer area';
+                    } else if (e.toString().contains('MISSING_LOCATION')) {
+                      errorMessage =
+                          'Location information required for task update';
+                    } else if (e.toString().contains(
+                      'Location not available',
+                    )) {
+                      errorMessage =
+                          'GPS location required. Please enable location services.';
+                    }
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(errorMessage),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
+              },
+              child: const Text('Update'),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  void _showLocationRestrictionDialog(BuildContext context, TaskWithDistance taskWithDistance) {
+  void _showLocationRestrictionDialog(
+    BuildContext context,
+    TaskWithDistance taskWithDistance,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -640,7 +717,7 @@ class AnimatedTaskCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final taskId = task['id']?.toString() ?? '';
     final animationType = ref.watch(taskAnimationProvider)[taskId];
-    
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -652,7 +729,7 @@ class AnimatedTaskCard extends ConsumerWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(
-            color: animationType == 'status_change' 
+            color: animationType == 'status_change'
                 ? cs.primary.withOpacity(0.3)
                 : Colors.black.withOpacity(0.08),
             width: animationType == 'status_change' ? 2 : 1,
@@ -666,18 +743,27 @@ class AnimatedTaskCard extends ConsumerWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: Text(assignedBy, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text(
+                      assignedBy,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                   const Spacer(),
                   // Distance display with animation
                   if (taskWithDistance.isLoadingAddress)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [Colors.grey.shade100, Colors.grey.shade200],
@@ -690,30 +776,35 @@ class AnimatedTaskCard extends ConsumerWidget {
                         height: 16,
                         child: LinearProgressIndicator(
                           backgroundColor: Colors.transparent,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey,
+                          ),
                         ),
                       ),
                     )
                   else if (taskWithDistance.distanceToCustomer != null)
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: taskWithDistance.distanceToCustomer! <= 200 
+                          colors: taskWithDistance.distanceToCustomer! <= 200
                               ? [Colors.green.shade50, Colors.green.shade100]
                               : [Colors.red.shade50, Colors.red.shade100],
                         ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: taskWithDistance.distanceToCustomer! <= 200 
+                          color: taskWithDistance.distanceToCustomer! <= 200
                               ? Colors.green.shade200
                               : Colors.red.shade200,
                           width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: taskWithDistance.distanceToCustomer! <= 200 
+                            color: taskWithDistance.distanceToCustomer! <= 200
                                 ? Colors.green.withOpacity(0.1)
                                 : Colors.red.withOpacity(0.1),
                             blurRadius: 8,
@@ -727,12 +818,14 @@ class AnimatedTaskCard extends ConsumerWidget {
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 300),
                             child: Icon(
-                              taskWithDistance.distanceToCustomer! <= 200 
+                              taskWithDistance.distanceToCustomer! <= 200
                                   ? Icons.location_on_rounded
                                   : Icons.location_off_rounded,
-                              key: ValueKey(taskWithDistance.distanceToCustomer! <= 200),
+                              key: ValueKey(
+                                taskWithDistance.distanceToCustomer! <= 200,
+                              ),
                               size: 18,
-                              color: taskWithDistance.distanceToCustomer! <= 200 
+                              color: taskWithDistance.distanceToCustomer! <= 200
                                   ? Colors.green.shade700
                                   : Colors.red.shade700,
                             ),
@@ -743,23 +836,29 @@ class AnimatedTaskCard extends ConsumerWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                DistanceCalculator.formatDistance(taskWithDistance.distanceToCustomer!),
+                                DistanceCalculator.formatDistance(
+                                  taskWithDistance.distanceToCustomer!,
+                                ),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
-                                  color: taskWithDistance.distanceToCustomer! <= 200 
+                                  color:
+                                      taskWithDistance.distanceToCustomer! <=
+                                          200
                                       ? Colors.green.shade700
                                       : Colors.red.shade700,
                                 ),
                               ),
                               Text(
-                                taskWithDistance.distanceToCustomer! <= 200 
+                                taskWithDistance.distanceToCustomer! <= 200
                                     ? 'In Range'
                                     : 'Out of Range',
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w600,
-                                  color: taskWithDistance.distanceToCustomer! <= 200 
+                                  color:
+                                      taskWithDistance.distanceToCustomer! <=
+                                          200
                                       ? Colors.green.shade600
                                       : Colors.red.shade600,
                                 ),
@@ -775,7 +874,7 @@ class AnimatedTaskCard extends ConsumerWidget {
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       child: IconButton(
-                        onPressed: taskWithDistance.canUpdateTask() 
+                        onPressed: taskWithDistance.canUpdateTask()
                             ? onUpdateTask
                             : onLocationRestriction,
                         icon: AnimatedSwitcher(
@@ -783,13 +882,13 @@ class AnimatedTaskCard extends ConsumerWidget {
                           child: Icon(
                             Icons.edit,
                             key: ValueKey(taskWithDistance.canUpdateTask()),
-                            color: taskWithDistance.canUpdateTask() 
-                                ? Color(0xFF2F6BFF) 
+                            color: taskWithDistance.canUpdateTask()
+                                ? Color(0xFF2F6BFF)
                                 : Colors.grey,
                           ),
                         ),
-                        tooltip: taskWithDistance.canUpdateTask() 
-                            ? 'Update Task' 
+                        tooltip: taskWithDistance.canUpdateTask()
+                            ? 'Update Task'
                             : 'Outside customer area - Cannot update',
                       ),
                     ),
@@ -797,7 +896,10 @@ class AnimatedTaskCard extends ConsumerWidget {
                   // Animated status badge
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: statusBg,
                       borderRadius: BorderRadius.circular(999),
@@ -807,10 +909,13 @@ class AnimatedTaskCard extends ConsumerWidget {
                       child: Text(
                         status,
                         key: ValueKey(status),
-                        style: TextStyle(color: statusFg, fontWeight: FontWeight.w800),
+                        style: TextStyle(
+                          color: statusFg,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -819,7 +924,10 @@ class AnimatedTaskCard extends ConsumerWidget {
                 child: Text(
                   title,
                   key: ValueKey(title),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
@@ -879,7 +987,11 @@ class AnimatedTaskCard extends ConsumerWidget {
                           color: Colors.blue.shade100,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.store, size: 16, color: Colors.blue.shade700),
+                        child: Icon(
+                          Icons.store,
+                          size: 16,
+                          color: Colors.blue.shade700,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -896,7 +1008,8 @@ class AnimatedTaskCard extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              taskWithDistance.customerAddress!['address'] ?? 'Customer Location',
+                              taskWithDistance.customerAddress!['address'] ??
+                                  'Customer Location',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.blue.shade900,
@@ -920,11 +1033,13 @@ class AnimatedTaskCard extends ConsumerWidget {
                   child: TextButton.icon(
                     onPressed: () {
                       final address = taskWithDistance.customerAddress;
-                        
+
                       // Safe navigation with null checks
                       if (address == null || address['id'] == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Customer address not available')),
+                          const SnackBar(
+                            content: Text('Customer address not available'),
+                          ),
                         );
                         return;
                       }
@@ -935,19 +1050,31 @@ class AnimatedTaskCard extends ConsumerWidget {
                           builder: (_) => AddressEditRequestScreen(
                             addressId: address['id'] as int,
                             currentAddress: address['address'] ?? '',
-                            currentLatitude: (address['latitude'] ?? 0).toDouble(),
-                            currentLongitude: (address['longitude'] ?? 0).toDouble(),
+                            currentLatitude: (address['latitude'] ?? 0)
+                                .toDouble(),
+                            currentLongitude: (address['longitude'] ?? 0)
+                                .toDouble(),
                           ),
                         ),
                       );
                     },
-                    icon: Icon(Icons.edit_location, size: 18, color: Colors.orange.shade600),
+                    icon: Icon(
+                      Icons.edit_location,
+                      size: 18,
+                      color: Colors.orange.shade600,
+                    ),
                     label: Text(
                       'Request Address Change',
-                      style: TextStyle(color: Colors.orange.shade600, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.orange.shade600,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 16,
+                      ),
                       backgroundColor: Colors.orange.shade50,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -961,22 +1088,25 @@ class AnimatedTaskCard extends ConsumerWidget {
                 const SizedBox(height: 8),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: taskWithDistance.distanceToCustomer! <= 200 
+                      colors: taskWithDistance.distanceToCustomer! <= 200
                           ? [Colors.green.shade50, Colors.green.shade100]
                           : [Colors.orange.shade50, Colors.amber.shade50],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: taskWithDistance.distanceToCustomer! <= 200 
+                      color: taskWithDistance.distanceToCustomer! <= 200
                           ? Colors.green.shade200
                           : Colors.orange.shade200,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: taskWithDistance.distanceToCustomer! <= 200 
+                        color: taskWithDistance.distanceToCustomer! <= 200
                             ? Colors.green.withOpacity(0.05)
                             : Colors.orange.withOpacity(0.05),
                         blurRadius: 8,
@@ -989,12 +1119,14 @@ class AnimatedTaskCard extends ConsumerWidget {
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
                         child: Icon(
-                          taskWithDistance.distanceToCustomer! <= 200 
+                          taskWithDistance.distanceToCustomer! <= 200
                               ? Icons.check_circle_rounded
                               : Icons.info_rounded,
-                          key: ValueKey(taskWithDistance.distanceToCustomer! <= 200),
+                          key: ValueKey(
+                            taskWithDistance.distanceToCustomer! <= 200,
+                          ),
                           size: 20,
-                          color: taskWithDistance.distanceToCustomer! <= 200 
+                          color: taskWithDistance.distanceToCustomer! <= 200
                               ? Colors.green.shade600
                               : Colors.orange.shade600,
                         ),
@@ -1004,14 +1136,16 @@ class AnimatedTaskCard extends ConsumerWidget {
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 300),
                           child: Text(
-                            taskWithDistance.distanceToCustomer! <= 200 
+                            taskWithDistance.distanceToCustomer! <= 200
                                 ? '✨ You are at customer location'
                                 : '📍 You are outside customer area',
-                            key: ValueKey(taskWithDistance.distanceToCustomer! <= 200),
+                            key: ValueKey(
+                              taskWithDistance.distanceToCustomer! <= 200,
+                            ),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: taskWithDistance.distanceToCustomer! <= 200 
+                              color: taskWithDistance.distanceToCustomer! <= 200
                                   ? Colors.green.shade700
                                   : Colors.orange.shade700,
                             ),

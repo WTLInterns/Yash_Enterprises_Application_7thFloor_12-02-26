@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:yashenterprisesapp/features/punch/presentation/providers/punch_providers.dart';
 
-import '../providers/punch_providers.dart';
+import '../../attendance/presentation/providers/attendance_providers.dart';
+import '../../attendance/presentation/providers/working_timer_provider.dart';
+import '../../../core/utils/time_format.dart';
 
 class PunchScreen extends ConsumerStatefulWidget {
   const PunchScreen({super.key});
@@ -30,21 +33,13 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
       vsync: this,
     );
 
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
 
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.easeInOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
 
     _pulseController.repeat(reverse: true);
   }
@@ -84,9 +79,7 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
         ),
         backgroundColor: Colors.green.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -104,9 +97,7 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
         ),
         backgroundColor: Colors.red.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -117,6 +108,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
     final punchState = ref.watch(punchControllerProvider);
     final animationType = ref.watch(punchAnimationProvider);
     final cs = Theme.of(context).colorScheme;
+
+    final todayAttendanceAsync = ref.watch(todayAttendanceProvider);
+    final workingTimer = ref.watch(workingTimerProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
@@ -178,7 +172,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            punchState.isPunchedIn ? 'Punched In' : 'Punched Out',
+                            punchState.isPunchedIn
+                                ? 'Punched In'
+                                : 'Punched Out',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -209,7 +205,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
                   _scaleController,
                 ]),
                 builder: (context, child) {
-                  final isActionAnim = animationType == 'punch_in' || animationType == 'punch_out';
+                  final isActionAnim =
+                      animationType == 'punch_in' ||
+                      animationType == 'punch_out';
                   final pulse = isActionAnim ? 1.0 : _pulseAnimation.value;
                   final scale = pulse * _scaleAnimation.value;
                   return Transform.scale(
@@ -236,7 +234,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
                             offset: const Offset(0, 8),
                           ),
                           BoxShadow(
-                            color: cs.primary.withOpacity(punchState.isPunchedIn ? 0.08 : 0.06),
+                            color: cs.primary.withOpacity(
+                              punchState.isPunchedIn ? 0.08 : 0.06,
+                            ),
                             blurRadius: 36,
                             spreadRadius: 2,
                             offset: const Offset(0, 10),
@@ -247,7 +247,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(100),
-                          onTap: punchState.isPunchedIn ? _handlePunchOut : _handlePunchIn,
+                          onTap: punchState.isPunchedIn
+                              ? _handlePunchOut
+                              : _handlePunchIn,
                           child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -267,7 +269,9 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
                                 AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 300),
                                   child: Text(
-                                    punchState.isPunchedIn ? 'Punch Out' : 'Punch In',
+                                    punchState.isPunchedIn
+                                        ? 'Punch Out'
+                                        : 'Punch In',
                                     key: ValueKey(punchState.isPunchedIn),
                                     style: const TextStyle(
                                       fontSize: 18,
@@ -292,7 +296,25 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
                   Expanded(
                     child: _buildInfoCard(
                       'Total Hours Today',
-                      '8h 24m',
+                      workingTimer.running
+                          ? formatHms(workingTimer.elapsed)
+                          : todayAttendanceAsync.when(
+                              data: (today) {
+                                final hoursRaw = today?['totalHours'];
+                                final hours = hoursRaw is num
+                                    ? hoursRaw.toDouble()
+                                    : double.tryParse(
+                                            hoursRaw?.toString() ?? '0',
+                                          ) ??
+                                          0;
+                                final totalMinutes = (hours * 60).round();
+                                return formatHms(
+                                  Duration(minutes: totalMinutes),
+                                );
+                              },
+                              loading: () => '...',
+                              error: (e, _) => '00:00:00',
+                            ),
                       Icons.access_time,
                       Colors.blue,
                     ),
@@ -315,7 +337,12 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
     );
   }
 
-  Widget _buildInfoCard(String title, String value, IconData icon, Color color) {
+  Widget _buildInfoCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

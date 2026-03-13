@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'background_location_service.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../tracking/background_tracking_service.dart';
+import 'robustbg_location_service.dart';
 
 class LocationTrackingState {
   final bool isTracking;
@@ -41,69 +44,88 @@ class LocationTrackingState {
 }
 
 class LocationTrackingNotifier extends StateNotifier<LocationTrackingState> {
-  final BackgroundLocationService _service;
-
-  LocationTrackingNotifier(this._service) : super(LocationTrackingState());
+  LocationTrackingNotifier() : super(LocationTrackingState());
 
   Future<void> initialize() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.initialize();
+      await RobustBgLocationService.instance.initialize();
+      Map<String, dynamic>? lastKnown;
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        );
+        lastKnown = {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'accuracy': position.accuracy,
+          'speed': position.speed,
+          'heading': position.heading,
+        };
+      } catch (_) {
+        lastKnown = null;
+      }
       state = state.copyWith(
         isInitialized: true,
+        lastKnownPosition: lastKnown,
+        lastUpdateTime: DateTime.now().toIso8601String(),
         isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> startTracking() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.startTracking();
-      state = state.copyWith(
-        isTracking: true,
-        isLoading: false,
+      await BackgroundTrackingService.start();
+      await RobustBgLocationService.instance.tick(
+        trigger: RobustBgTickTrigger.manual,
       );
+      state = state.copyWith(isTracking: true, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> stopTracking() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _service.stopTracking();
-      state = state.copyWith(
-        isTracking: false,
-        isLoading: false,
-      );
+      await BackgroundTrackingService.stop();
+      state = state.copyWith(isTracking: false, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> updateStatus() async {
     try {
-      final status = _service.getTrackingStatus();
+      Map<String, dynamic>? lastKnown;
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        );
+        lastKnown = {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'accuracy': position.accuracy,
+          'speed': position.speed,
+          'heading': position.heading,
+        };
+      } catch (_) {
+        lastKnown = state.lastKnownPosition;
+      }
       state = state.copyWith(
-        isInitialized: status['isInitialized'] ?? false,
-        isTracking: status['isTracking'] ?? false,
-        lastKnownPosition: status['lastKnownPosition'],
-        lastUpdateTime: status['lastUpdateTime'],
+        isInitialized: true,
+        isTracking: state.isTracking,
+        lastKnownPosition: lastKnown,
+        lastUpdateTime: DateTime.now().toIso8601String(),
       );
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -116,22 +138,43 @@ class LocationTrackingNotifier extends StateNotifier<LocationTrackingState> {
 }
 
 // Provider
-final locationTrackingServiceProvider = Provider<BackgroundLocationService>((ref) {
-  return BackgroundLocationService();
-});
-
-final locationTrackingProvider = StateNotifierProvider<LocationTrackingNotifier, LocationTrackingState>((ref) {
-  final service = ref.watch(locationTrackingServiceProvider);
-  return LocationTrackingNotifier(service);
-});
+final locationTrackingProvider =
+    StateNotifierProvider<LocationTrackingNotifier, LocationTrackingState>((
+      ref,
+    ) {
+      return LocationTrackingNotifier();
+    });
 
 // Stream provider for real-time updates
-final locationStatusStreamProvider = StreamProvider<Map<String, dynamic>>((ref) async* {
-  final service = ref.watch(locationTrackingServiceProvider);
-  
+final locationStatusStreamProvider = StreamProvider<Map<String, dynamic>>((
+  ref,
+) async* {
+  // No longer backed by a legacy service. Emit best-effort snapshots for UI.
+
   while (true) {
     await Future.delayed(Duration(seconds: 10));
-    final status = service.getTrackingStatus();
-    yield status;
+    Map<String, dynamic>? lastKnown;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+      lastKnown = {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'accuracy': position.accuracy,
+        'speed': position.speed,
+        'heading': position.heading,
+      };
+    } catch (_) {
+      lastKnown = null;
+    }
+
+    yield {
+      'isInitialized': true,
+      'isTracking': ref.read(locationTrackingProvider).isTracking,
+      'lastKnownPosition': lastKnown,
+      'lastUpdateTime': DateTime.now().toIso8601String(),
+    };
   }
 });

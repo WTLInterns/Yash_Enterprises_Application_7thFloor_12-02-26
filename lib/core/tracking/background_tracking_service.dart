@@ -1,18 +1,15 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:ui';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../config/app_config.dart';
+import '../location/robustbg_location_service.dart';
 
 @pragma('vm:entry-point')
 class BackgroundTrackingService {
   static const _kPunchedInKey = 'punched_in';
-  static const _minDistanceMeters = 10.0;
 
   static Future<void> configure() async {
     final service = FlutterBackgroundService();
@@ -22,10 +19,14 @@ class BackgroundTrackingService {
         isForegroundMode: true,
         autoStart: false,
         autoStartOnBoot: true,
-        notificationChannelId: 'yashraj_tracking',
-        initialNotificationTitle: 'Yashraj Tracking',
+        notificationChannelId: 'location_tracking',
+        initialNotificationTitle: 'Location Tracking',
         initialNotificationContent: 'Service is starting...',
         foregroundServiceNotificationId: 888,
+        foregroundServiceTypes: [
+          AndroidForegroundType.location,
+          AndroidForegroundType.dataSync,
+        ],
       ),
       iosConfiguration: IosConfiguration(
         autoStart: false,
@@ -33,6 +34,8 @@ class BackgroundTrackingService {
         onBackground: _onIosBackground,
       ),
     );
+
+    await RobustBgLocationService.instance.initialize();
   }
 
   static Future<void> start() async {
@@ -53,7 +56,6 @@ class BackgroundTrackingService {
     DartPluginRegistrant.ensureInitialized();
 
     Timer? timer;
-    Position? lastSent;
 
     if (service is AndroidServiceInstance) {
       service.setAsForegroundService();
@@ -65,7 +67,7 @@ class BackgroundTrackingService {
       });
 
       service.setForegroundNotificationInfo(
-        title: 'Yashraj Tracking',
+        title: 'Location Tracking',
         content: 'Tracking location in background',
       );
     }
@@ -88,61 +90,10 @@ class BackgroundTrackingService {
     }
 
     timer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      final punchedInRaw = await storage.read(key: _kPunchedInKey);
-      final punchedIn = punchedInRaw == '1';
-      if (!punchedIn) return;
-
-      final token = await storage.read(key: 'auth_token');
-      final employeeIdStr = await storage.read(key: 'employee_id');
-      final employeeId = employeeIdStr != null ? int.tryParse(employeeIdStr) : null;
-      if (token == null || token.isEmpty || employeeId == null) return;
-
-      final perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
-
-      Position pos;
       try {
-        pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      } catch (_) {
-        return;
-      }
-
-      // Only send if moved enough.
-      if (lastSent != null) {
-        final dist = Geolocator.distanceBetween(
-          lastSent!.latitude,
-          lastSent!.longitude,
-          pos.latitude,
-          pos.longitude,
+        await RobustBgLocationService.instance.tick(
+          trigger: RobustBgTickTrigger.foregroundServiceTimer,
         );
-        if (dist < _minDistanceMeters) return;
-      }
-
-      final dio = Dio(
-        BaseOptions(
-          baseUrl: '${AppConfig.baseUrl}/api',
-          connectTimeout: const Duration(seconds: 20),
-          receiveTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 30),
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        ),
-      );
-
-      try {
-        await dio.post('/employee-locations/$employeeId/location', data: {
-          'latitude': pos.latitude,
-          'longitude': pos.longitude,
-          'altitude': pos.altitude,
-          'accuracy': pos.accuracy,
-          'timestamp': DateTime.now().toIso8601String(),
-          'trackingType': 'AUTO',
-          'isActive': true,
-          'deviceInfo': 'Android ${Platform.operatingSystemVersion}',
-        });
-        lastSent = pos;
       } catch (e) {
         // Keep background service alive even if network fails.
         print('Location send failed: $e');

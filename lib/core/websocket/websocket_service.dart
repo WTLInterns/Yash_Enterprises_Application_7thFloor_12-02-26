@@ -4,6 +4,8 @@ import 'package:stomp_dart_client/stomp_dart_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../config/app_config.dart';
+
 class WebSocketService {
   static WebSocketService? _instance;
   static WebSocketService get instance {
@@ -18,18 +20,22 @@ class WebSocketService {
   bool _isConnected = false;
   bool _isConnecting = false;
   final Map<String, dynamic> _subscriptions = {};
-  
+
   // Stream controllers for real-time updates
-  final _attendanceController = StreamController<Map<String, dynamic>>.broadcast();
+  final _attendanceController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _taskController = StreamController<Map<String, dynamic>>.broadcast();
   final _punchController = StreamController<Map<String, dynamic>>.broadcast();
-  final _adminNotificationController = StreamController<Map<String, dynamic>>.broadcast();
+  final _adminNotificationController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // Public streams
-  Stream<Map<String, dynamic>> get attendanceEvents => _attendanceController.stream;
+  Stream<Map<String, dynamic>> get attendanceEvents =>
+      _attendanceController.stream;
   Stream<Map<String, dynamic>> get taskEvents => _taskController.stream;
   Stream<Map<String, dynamic>> get punchEvents => _punchController.stream;
-  Stream<Map<String, dynamic>> get adminNotificationStream => _adminNotificationController.stream;
+  Stream<Map<String, dynamic>> get adminNotificationStream =>
+      _adminNotificationController.stream;
 
   bool get isConnected => _isConnected;
 
@@ -40,15 +46,19 @@ class WebSocketService {
 
     try {
       // Get JWT token from secure storage
-      final token = await _secureStorage.read(key: 'jwt_token');
-      
+      final token = await _secureStorage.read(key: 'auth_token');
+
       // Prepare headers with JWT authentication
-      final stompHeaders = token != null ? {'Authorization': 'Bearer $token'} : <String, String>{};
-      final webSocketHeaders = token != null ? {'Authorization': 'Bearer $token'} : <String, dynamic>{};
+      final stompHeaders = token != null
+          ? {'Authorization': 'Bearer $token'}
+          : <String, String>{};
+      final webSocketHeaders = token != null
+          ? {'Authorization': 'Bearer $token'}
+          : <String, dynamic>{};
 
       _stompClient = StompClient(
         config: StompConfig(
-          url: 'ws://localhost:8080/ws',
+          url: AppConfig.wsUrl,
           onConnect: _onConnect,
           onDisconnect: _onDisconnect,
           onStompError: _onStompError,
@@ -144,7 +154,6 @@ class WebSocketService {
         },
       );
       _subscriptions['adminNotification'] = adminSub;
-
     } catch (e) {
       print('Error subscribing to topics: $e');
     }

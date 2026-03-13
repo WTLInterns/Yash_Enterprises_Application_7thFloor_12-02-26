@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/storage_providers.dart';
-import '../../../../core/location/robust_location_service.dart';
+import '../../../../core/tracking/background_tracking_service.dart';
 import '../../../../core/websocket/websocket_providers.dart';
 import '../../data/datasource/punch_api.dart';
 import '../../data/repository/punch_repository.dart';
@@ -35,7 +35,8 @@ class PunchState {
 }
 
 class PunchController extends StateNotifier<PunchState> {
-  PunchController(this._ref) : super(const PunchState(isPunchedIn: false, loading: false)) {
+  PunchController(this._ref)
+    : super(const PunchState(isPunchedIn: false, loading: false)) {
     _init();
     _startRealTimeListening();
   }
@@ -78,7 +79,7 @@ class PunchController extends StateNotifier<PunchState> {
     // Handle real-time punch events
     final eventType = event['type'];
     final employeeId = event['employeeId'];
-    
+
     // Update local punch state based on event
     if (eventType == 'PUNCH_IN') {
       state = state.copyWith(isPunchedIn: true);
@@ -90,7 +91,7 @@ class PunchController extends StateNotifier<PunchState> {
   void _handleAttendanceEvent(Map<String, dynamic> event) {
     // Handle real-time attendance events that might affect punch status
     final eventType = event['type'];
-    
+
     // Update punch state based on attendance events
     if (eventType == 'ATTENDANCE_MARKED') {
       // Could indicate punch-in
@@ -109,7 +110,7 @@ class PunchController extends StateNotifier<PunchState> {
     // If user was already punched-in, ensure background tracking is running.
     if (flag) {
       await _secureStorage.write(key: _kPunchedInKey, value: '1');
-      await RobustLocationService().startTracking();
+      await BackgroundTrackingService.start();
     }
   }
 
@@ -118,12 +119,16 @@ class PunchController extends StateNotifier<PunchState> {
     state = state.copyWith(loading: true);
     try {
       await _ensurePermission();
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
       await _ref.read(punchRepositoryProvider).punchIn(position: pos);
-      await _ref.read(rawKeyValueStorageProvider).writeBool(_kPunchedInKey, true);
+      await _ref
+          .read(rawKeyValueStorageProvider)
+          .writeBool(_kPunchedInKey, true);
       await _secureStorage.write(key: _kPunchedInKey, value: '1');
       state = state.copyWith(isPunchedIn: true);
-      await RobustLocationService().startTracking();
+      await BackgroundTrackingService.start();
     } finally {
       state = state.copyWith(loading: false);
     }
@@ -134,12 +139,16 @@ class PunchController extends StateNotifier<PunchState> {
     state = state.copyWith(loading: true);
     try {
       await _ensurePermission();
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
       await _ref.read(punchRepositoryProvider).punchOut(position: pos);
-      await _ref.read(rawKeyValueStorageProvider).writeBool(_kPunchedInKey, false);
+      await _ref
+          .read(rawKeyValueStorageProvider)
+          .writeBool(_kPunchedInKey, false);
       await _secureStorage.write(key: _kPunchedInKey, value: '0');
       state = state.copyWith(isPunchedIn: false);
-      await RobustLocationService().stopTracking();
+      await BackgroundTrackingService.stop();
     } finally {
       state = state.copyWith(loading: false);
     }
@@ -162,21 +171,23 @@ class PunchController extends StateNotifier<PunchState> {
   }
 }
 
-final punchControllerProvider = StateNotifierProvider<PunchController, PunchState>((ref) {
-  return PunchController(ref);
-});
+final punchControllerProvider =
+    StateNotifierProvider<PunchController, PunchState>((ref) {
+      return PunchController(ref);
+    });
 
 // Phase-5: Punch animation provider
-final punchAnimationProvider = StateNotifierProvider<PunchAnimationNotifier, String>((ref) {
-  return PunchAnimationNotifier();
-});
+final punchAnimationProvider =
+    StateNotifierProvider<PunchAnimationNotifier, String>((ref) {
+      return PunchAnimationNotifier();
+    });
 
 class PunchAnimationNotifier extends StateNotifier<String> {
   PunchAnimationNotifier() : super('');
 
   void triggerPunchAnimation(String type) {
     state = type;
-    
+
     // Reset animation after completion
     Future.delayed(const Duration(milliseconds: 600), () {
       state = '';

@@ -6,7 +6,6 @@ import '../../../../core/storage/secure_session_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/distance_calculator.dart';
 import '../../../../core/location/location_provider.dart';
-import '../../../../core/location/simple_location_service.dart';
 import '../../../../core/websocket/websocket_providers.dart';
 import '../../data/datasource/task_api.dart';
 import '../../data/repository/task_repository.dart';
@@ -37,20 +36,23 @@ final tasksProvider = FutureProvider<List<dynamic>>((ref) async {
   // Store employee ID in provider for real-time access
   ref.read(currentEmployeeIdProvider.notifier).state = employeeId;
 
-  return ref.watch(taskRepositoryProvider).getTasksForEmployee(int.parse(employeeId));
+  return ref
+      .watch(taskRepositoryProvider)
+      .getTasksForEmployee(int.parse(employeeId));
 });
 
 // Phase-5: Task animation state provider
-final taskAnimationProvider = StateNotifierProvider<TaskAnimationNotifier, Map<String, String>>((ref) {
-  return TaskAnimationNotifier();
-});
+final taskAnimationProvider =
+    StateNotifierProvider<TaskAnimationNotifier, Map<String, String>>((ref) {
+      return TaskAnimationNotifier();
+    });
 
 class TaskAnimationNotifier extends StateNotifier<Map<String, String>> {
   TaskAnimationNotifier() : super({});
 
   void triggerAnimation(String taskId, String animationType) {
     state = {...state, taskId: animationType};
-    
+
     // Remove animation after completion
     Future.delayed(const Duration(milliseconds: 500), () {
       final newState = Map<String, String>.from(state);
@@ -93,7 +95,8 @@ class TaskWithDistance {
 
   bool get shouldRecalculate {
     if (lastCalculated == null) return true;
-    return DateTime.now().difference(lastCalculated!).inMinutes > 5; // 5-min cache
+    return DateTime.now().difference(lastCalculated!).inMinutes >
+        5; // 5-min cache
   }
 
   // Task validation method
@@ -101,11 +104,11 @@ class TaskWithDistance {
     if (distanceToCustomer == null) {
       return true; // Allow if no distance data
     }
-    
+
     if (distanceToCustomer! > 200.0) {
       return false; // Block if >200m
     }
-    
+
     return true; // Allow if ≤200m
   }
 }
@@ -118,14 +121,14 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
 
   Future<void> loadCustomerAddresses(List<Map<String, dynamic>> tasks) async {
     final taskRepo = _ref.read(taskRepositoryProvider);
-    
+
     // Get current location from existing provider (if available)
     Position? currentPos;
     try {
       // Try to use existing location provider first
       final locationState = _ref.read(locationTrackingProvider);
       final currentPosition = locationState.currentPosition;
-      
+
       if (currentPosition != null) {
         final latitude = currentPosition['latitude'] as double?;
         final longitude = currentPosition['longitude'] as double?;
@@ -148,7 +151,7 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
       // Fallback to direct GPS call if provider not available
       try {
         currentPos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high
+          desiredAccuracy: LocationAccuracy.high,
         );
       } catch (e) {
         print('Error getting current location: $e');
@@ -158,19 +161,21 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
     final finalTasks = <TaskWithDistance>[];
     for (final task in tasks) {
       final taskId = task['id'];
-      
+
       // Check cache first
       TaskWithDistance? cachedTask = _cache[taskId];
-      
+
       if (cachedTask == null || cachedTask.shouldRecalculate) {
         // Fetch customer address
-        final customerAddress = await taskRepo.getCustomerAddressForTask(taskId);
-        
+        final customerAddress = await taskRepo.getCustomerAddressForTask(
+          taskId,
+        );
+
         double? distance;
         if (currentPos != null && customerAddress != null) {
           final customerLat = customerAddress['latitude']?.toDouble();
           final customerLng = customerAddress['longitude']?.toDouble();
-          
+
           if (customerLat != null && customerLng != null) {
             distance = DistanceCalculator.calculateDistance(
               currentPos.latitude,
@@ -188,28 +193,29 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
           isLoadingAddress: false,
           lastCalculated: DateTime.now(),
         );
-        
+
         // Update cache
         _cache[taskId] = cachedTask;
       }
-      
+
       finalTasks.add(cachedTask);
     }
-    
+
     state = finalTasks;
   }
 
   // Update task status for real-time updates
   void updateTaskStatus(String taskId, String status) {
-    final taskIndex = state.indexWhere((taskWithDistance) => 
-        taskWithDistance.task['id']?.toString() == taskId);
-    
+    final taskIndex = state.indexWhere(
+      (taskWithDistance) => taskWithDistance.task['id']?.toString() == taskId,
+    );
+
     if (taskIndex != -1) {
       final updatedTaskWithDistance = state[taskIndex].copyWith(
         task: Map<String, dynamic>.from(state[taskIndex].task)
           ..['status'] = status,
       );
-      
+
       final newState = List<TaskWithDistance>.from(state);
       newState[taskIndex] = updatedTaskWithDistance;
       state = newState;
@@ -217,14 +223,20 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
   }
 }
 
-final tasksWithDistanceProvider = StateNotifierProvider<TaskWithDistanceNotifier, List<TaskWithDistance>>((ref) {
-  return TaskWithDistanceNotifier(ref);
-});
+final tasksWithDistanceProvider =
+    StateNotifierProvider<TaskWithDistanceNotifier, List<TaskWithDistance>>((
+      ref,
+    ) {
+      return TaskWithDistanceNotifier(ref);
+    });
 
 // Real-time task update provider - PHASE-4 FIXED
-final realTimeTaskNotifierProvider = StateNotifierProvider<RealTimeTaskNotifier, List<Map<String, dynamic>>>((ref) {
-  return RealTimeTaskNotifier(ref);
-});
+final realTimeTaskNotifierProvider =
+    StateNotifierProvider<RealTimeTaskNotifier, List<Map<String, dynamic>>>((
+      ref,
+    ) {
+      return RealTimeTaskNotifier(ref);
+    });
 
 class RealTimeTaskNotifier extends StateNotifier<List<Map<String, dynamic>>> {
   RealTimeTaskNotifier(this._ref) : super([]);
@@ -274,25 +286,29 @@ class RealTimeTaskNotifier extends StateNotifier<List<Map<String, dynamic>>> {
     final taskId = event['taskId']?.toString();
     final status = event['status'];
     final assignedToEmployeeId = event['assignedToEmployeeId']?.toString();
-    
+
     if (taskId != null && status != null) {
       // Guard against null assignedToEmployeeId
       if (assignedToEmployeeId == null) return;
-      
+
       // Get current logged-in employee ID from provider (sync)
       final currentEmployeeId = _ref.read(currentEmployeeIdProvider);
-      
+
       // Skip updates for tasks not assigned to current employee
-      if (currentEmployeeId != null && 
+      if (currentEmployeeId != null &&
           assignedToEmployeeId != currentEmployeeId) {
         return; // Ignore updates for other employees' tasks
       }
-      
+
       // Phase-4: Update TaskWithDistance state
-      _ref.read(tasksWithDistanceProvider.notifier).updateTaskStatus(taskId, status);
-      
+      _ref
+          .read(tasksWithDistanceProvider.notifier)
+          .updateTaskStatus(taskId, status);
+
       // Phase-5: Trigger animation
-      _ref.read(taskAnimationProvider.notifier).triggerAnimation(taskId, 'status_change');
+      _ref
+          .read(taskAnimationProvider.notifier)
+          .triggerAnimation(taskId, 'status_change');
     }
   }
 

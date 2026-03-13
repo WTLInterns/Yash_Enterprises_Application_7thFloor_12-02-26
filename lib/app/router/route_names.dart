@@ -1,6 +1,6 @@
 class RouteNames {
   static const splash = '/';
-  static const language = '/language';
+  // static const language = '/language';
   static const permissions = '/permissions';
   static const login = '/login';
 

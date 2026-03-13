@@ -7,8 +7,8 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:yashenterprisesapp/app/app.dart';
 
-import 'package:unoloapp/app/app.dart';
 
 void main() {
   testWidgets('App boots', (WidgetTester tester) async {
