@@ -128,8 +128,12 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                           final category = (m['category'] ?? 'Expense').toString();
                           final desc = (m['description'] ?? '').toString();
                           final date = (m['expenseDate'] ?? '').toString();
+                          final time = (m['expenseTime'] ?? '').toString();
                           final amount = (m['amount'] ?? 0).toString();
                           final status = (m['status'] ?? 'Pending').toString();
+                          final employeeName = (m['employeeName'] ?? '').toString();
+                          final departmentName = (m['departmentName'] ?? '').toString();
+                          final receiptUrl = (m['receiptUrl'] ?? '').toString();
 
                           return Card(
                             child: Padding(
@@ -137,6 +141,7 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  /// Category + Status
                                   Row(
                                     children: [
                                       Text(category, style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -144,19 +149,77 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                                       Text(status, style: TextStyle(color: Colors.black.withOpacity(0.6))),
                                     ],
                                   ),
+
+                                  const SizedBox(height: 6),
+
+                                  /// Employee + Department
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.person, size: 16),
+                                      const SizedBox(width: 6),
+                                      Text(employeeName.isEmpty ? 'Unknown Employee' : employeeName),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        departmentName.isEmpty ? '(No Department)' : '($departmentName)',
+                                        style: const TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+
+                                  /// Description
                                   if (desc.isNotEmpty) ...[
                                     const SizedBox(height: 6),
                                     Text(desc, style: TextStyle(color: Colors.black.withOpacity(0.65))),
                                   ],
-                                  const SizedBox(height: 10),
+
+                                  const SizedBox(height: 8),
+
+                                  /// Date + Time
                                   Row(
                                     children: [
                                       const Icon(Icons.calendar_month, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: Text(date.isEmpty ? '-' : date)),
-                                      Text('₹ $amount', style: const TextStyle(fontWeight: FontWeight.w900)),
+                                      const SizedBox(width: 6),
+                                      Text(date.isEmpty ? '-' : date),
+                                      const SizedBox(width: 10),
+                                      Text(time.isEmpty ? '' : time),
                                     ],
                                   ),
+
+                                  const SizedBox(height: 8),
+
+                                  /// Amount
+                                  Text(
+                                    '₹ $amount',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  /// Evidence Image/File
+                                  if (receiptUrl.isNotEmpty)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Image.network(
+                                        "http://localhost:8080$receiptUrl",
+                                        height: 120,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Container(
+                                            height: 120,
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Center(
+                                              child: Icon(Icons.broken_image, color: Colors.grey),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
