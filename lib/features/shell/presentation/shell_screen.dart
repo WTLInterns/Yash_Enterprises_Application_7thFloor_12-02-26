@@ -18,7 +18,6 @@ class _ShellScreenState extends State<ShellScreen> {
 
   final _screens = const [
     HomeScreen(),
-    TaskScreen(),
     DashboardScreen(),
     ClientScreen(),
     ExpenseScreen(),
@@ -49,11 +48,34 @@ class _ShellScreenState extends State<ShellScreen> {
             ),
             child: Row(
               children: [
-                _navItem(cs, index: 0, label: 'Home', icon: Icons.home_outlined, activeIcon: Icons.home),
-                _navItem(cs, index: 1, label: 'Task', icon: Icons.task_alt_outlined, activeIcon: Icons.task_alt),
-                _navItem(cs, index: 2, label: 'Dashboard', icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month),
-                _navItem(cs, index: 3, label: 'Client', icon: Icons.business_outlined, activeIcon: Icons.business),
-                _navItem(cs, index: 4, label: 'Expense', icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long),
+                _navItem(
+                  cs,
+                  index: 0,
+                  label: 'Home',
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home,
+                ),
+                _navItem(
+                  cs,
+                  index: 1,
+                  label: 'Attendance',
+                  icon: Icons.calendar_month_outlined,
+                  activeIcon: Icons.calendar_month,
+                ),
+                _navItem(
+                  cs,
+                  index: 2,
+                  label: 'Client',
+                  icon: Icons.business_outlined,
+                  activeIcon: Icons.business,
+                ),
+                _navItem(
+                  cs,
+                  index: 3,
+                  label: 'Expense',
+                  icon: Icons.receipt_long_outlined,
+                  activeIcon: Icons.receipt_long,
+                ),
               ],
             ),
           ),
@@ -77,7 +99,10 @@ class _ShellScreenState extends State<ShellScreen> {
         child: Center(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.symmetric(horizontal: active ? 14 : 0, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: active ? 14 : 0,
+              vertical: 10,
+            ),
             decoration: active
                 ? BoxDecoration(
                     color: cs.primary.withOpacity(0.10),
@@ -88,13 +113,20 @@ class _ShellScreenState extends State<ShellScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(active ? activeIcon : icon, color: active ? cs.primary : Colors.black.withOpacity(0.55), size: 22),
+                Icon(
+                  active ? activeIcon : icon,
+                  color: active ? cs.primary : Colors.black.withOpacity(0.55),
+                  size: 22,
+                ),
                 if (active) ...[
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      label, 
-                      style: TextStyle(color: cs.primary, fontWeight: FontWeight.w800),
+                      label,
+                      style: TextStyle(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),

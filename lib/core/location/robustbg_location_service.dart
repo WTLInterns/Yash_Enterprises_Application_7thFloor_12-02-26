@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:background_fetch/background_fetch.dart' as bg;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geocoding/geocoding.dart';
@@ -411,6 +412,13 @@ class RobustBgLocationService {
   }
 
   Future<void> _initializeBackgroundFetch() async {
+    if (!(Platform.isAndroid || Platform.isIOS)) {
+      return;
+    }
+
+    if (ServicesBinding.rootIsolateToken == null) {
+      return;
+    }
     try {
       await bg.BackgroundFetch.configure(
         bg.BackgroundFetchConfig(

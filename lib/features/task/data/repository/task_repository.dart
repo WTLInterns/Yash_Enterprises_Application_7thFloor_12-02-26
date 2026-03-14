@@ -6,10 +6,17 @@ class TaskRepository {
   final TaskApi _api;
 
   Future<List<dynamic>> getTasks() => _api.listTasks();
-  Future<List<dynamic>> getTasksForEmployee(int employeeId) => _api.getTasksForEmployee(employeeId);
+  Future<List<dynamic>> getTasksForEmployee(int employeeId) =>
+      _api.getTasksForEmployee(employeeId);
+  Future<List<dynamic>> getTasksForEmployeeAndClient(
+    int employeeId,
+    int clientId,
+  ) => _api.getTasksForEmployeeAndClient(employeeId, clientId);
   Future<Map<String, dynamic>> getTask(int id) => _api.getTask(id);
-  Future<void> createTask(Map<String, dynamic> payload) => _api.createTask(payload);
-  Future<void> updateTask(int id, Map<String, dynamic> payload) => _api.updateTask(id, payload);
+  Future<void> createTask(Map<String, dynamic> payload) =>
+      _api.createTask(payload);
+  Future<void> updateTask(int id, Map<String, dynamic> payload) =>
+      _api.updateTask(id, payload);
   Future<void> updateTaskStatus(
     int id,
     String status,
@@ -19,23 +26,26 @@ class TaskRepository {
   }) async {
     // Note: Location headers are not currently supported by updateTaskStatus API
     // This method signature kept for future enhancement
-    
+
     await _api.updateTaskStatus(id, status, employeeId);
   }
+
   Future<void> deleteTask(int id) => _api.deleteTask(id);
-  
+
   Future<Map<String, dynamic>?> getCustomerAddressForTask(int taskId) async {
     try {
       // First get task with customer_address_id
       final taskResponse = await _api.get('/tasks/$taskId');
       final task = taskResponse.data;
-      
+
       if (task['customerAddressId'] == null) {
         return null;
       }
-      
+
       // Then get customer address via customer_address_id
-      final addressResponse = await _api.get('/customer-addresses/${task['customerAddressId']}');
+      final addressResponse = await _api.get(
+        '/customer-addresses/${task['customerAddressId']}',
+      );
       return addressResponse.data;
     } catch (e) {
       print('Error fetching customer address: $e');

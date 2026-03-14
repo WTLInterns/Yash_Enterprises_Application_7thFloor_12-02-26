@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'providers/client_providers.dart';
+import '../../task/presentation/task_screen.dart';
 
 class ClientScreen extends ConsumerStatefulWidget {
   const ClientScreen({super.key});
@@ -10,14 +11,15 @@ class ClientScreen extends ConsumerStatefulWidget {
   ConsumerState<ClientScreen> createState() => _ClientScreenState();
 }
 
-class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerProviderStateMixin {
+class _ClientScreenState extends ConsumerState<ClientScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tab;
   final _search = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -37,80 +39,51 @@ class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerPr
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
-        title: const Text('Client'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              children: [
-                InkWell(
-                  onTap: () {
-                    ref.invalidate(clientsProvider);
-                    ref.invalidate(sitesProvider);
-                  },
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Icon(Icons.list_alt, color: Colors.white, size: 20),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                InkWell(
-                  onTap: () {},
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Icon(Icons.location_on_outlined, color: Colors.white, size: 20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        title: const Center(child: Text('Client')),
+        // actions: [
+        //   Padding(
+        //     padding: const EdgeInsets.only(right: 8),
+        //     child: Row(
+        //       children: [
+        //         InkWell(
+        //           onTap: () {
+        //             ref.invalidate(clientsProvider);
+        //             ref.invalidate(sitesProvider);
+        //           },
+        //           borderRadius: BorderRadius.circular(999),
+        //           child: Container(
+        //             height: 36,
+        //             width: 36,
+        //             decoration: BoxDecoration(
+        //               color: cs.primary,
+        //               borderRadius: BorderRadius.circular(999),
+        //             ),
+        //             child: const Icon(Icons.list_alt, color: Colors.white, size: 20),
+        //           ),
+        //         ),
+        //         const SizedBox(width: 10),
+        //         InkWell(
+        //           onTap: () {},
+        //           borderRadius: BorderRadius.circular(999),
+        //           child: Container(
+        //             height: 36,
+        //             width: 36,
+        //             decoration: BoxDecoration(
+        //               color: Colors.black,
+        //               borderRadius: BorderRadius.circular(999),
+        //             ),
+        //             child: const Icon(Icons.location_on_outlined, color: Colors.white, size: 20),
+        //           ),
+        //         ),
+        //       ],
+        //     ),
+        //   ),
+        // ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.campaign, color: cs.primary),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'How to Edit/Add Clients [Updated] -\nWatch Quick Video Guide.',
-                      style: TextStyle(color: Color(0xFF2F6FED), fontWeight: FontWeight.w600, height: 1.15),
-                    ),
-                  ),
-                  const Icon(Icons.play_circle_outline, color: Colors.red),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
             SizedBox(
               height: 44,
               child: TabBar(
@@ -123,7 +96,7 @@ class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerPr
                 tabs: const [
                   Tab(text: 'All'),
                   Tab(text: 'Clients'),
-                  Tab(text: 'Sites'),
+                  // Tab(text: 'Sites'),
                 ],
               ),
             ),
@@ -162,9 +135,24 @@ class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerPr
               child: TabBarView(
                 controller: _tab,
                 children: [
-                  _asyncList(cs, clientsAsync: clientsAsync, sitesAsync: sitesAsync, mode: _ClientMode.all),
-                  _asyncList(cs, clientsAsync: clientsAsync, sitesAsync: sitesAsync, mode: _ClientMode.clients),
-                  _asyncList(cs, clientsAsync: clientsAsync, sitesAsync: sitesAsync, mode: _ClientMode.sites),
+                  _asyncList(
+                    cs,
+                    clientsAsync: clientsAsync,
+                    sitesAsync: sitesAsync,
+                    mode: _ClientMode.all,
+                  ),
+                  _asyncList(
+                    cs,
+                    clientsAsync: clientsAsync,
+                    sitesAsync: sitesAsync,
+                    mode: _ClientMode.clients,
+                  ),
+                  // _asyncList(
+                  //   cs,
+                  //   clientsAsync: clientsAsync,
+                  //   sitesAsync: sitesAsync,
+                  //   mode: _ClientMode.sites,
+                  // ),
                 ],
               ),
             ),
@@ -193,10 +181,28 @@ class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerPr
         final filtered = q.isEmpty
             ? items
             : items.where((e) {
-                final m = e is Map ? Map<String, dynamic>.from(e as Map) : <String, dynamic>{};
-                final name = _str(m, ['name', 'clientName', 'siteName', 'title']);
-                final addr = _str(m, ['address', 'location', 'city', 'billingAddress', 'shippingAddress']);
-                final phone = _str(m, ['phone', 'mobile', 'contactNumber', 'phoneNumber']);
+                final m = e is Map
+                    ? Map<String, dynamic>.from(e as Map)
+                    : <String, dynamic>{};
+                final name = _str(m, [
+                  'name',
+                  'clientName',
+                  'siteName',
+                  'title',
+                ]);
+                final addr = _str(m, [
+                  'address',
+                  'location',
+                  'city',
+                  'billingAddress',
+                  'shippingAddress',
+                ]);
+                final phone = _str(m, [
+                  'phone',
+                  'mobile',
+                  'contactNumber',
+                  'phoneNumber',
+                ]);
                 return (name + addr + phone).toLowerCase().contains(q);
               }).toList();
 
@@ -206,71 +212,120 @@ class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerPr
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, i) {
             final raw = filtered[i];
-            final m = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
-            final name = _str(m, ['name', 'clientName', 'siteName', 'title'], fallback: '—');
-            final addr = _str(m, ['address', 'location', 'city', 'billingAddress', 'shippingAddress'], fallback: '');
-            final phone = _str(m, ['phone', 'mobile', 'contactNumber', 'phoneNumber'], fallback: '');
+            final m = raw is Map
+                ? Map<String, dynamic>.from(raw as Map)
+                : <String, dynamic>{};
+            final clientIdRaw = m['id'];
+            final clientId = clientIdRaw is int
+                ? clientIdRaw
+                : (clientIdRaw is num ? clientIdRaw.toInt() : null);
+            final name = _str(m, [
+              'name',
+              'clientName',
+              'siteName',
+              'title',
+            ], fallback: '—');
+            final addr = _str(m, [
+              'address',
+              'location',
+              'city',
+              'billingAddress',
+              'shippingAddress',
+            ], fallback: '');
+            final phone = _str(m, [
+              'phone',
+              'mobile',
+              'contactNumber',
+              'phoneNumber',
+            ], fallback: '');
 
-            return Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.black.withOpacity(0.08)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.business_outlined, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name.toUpperCase(),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w900),
+            return InkWell(
+              onTap: clientId == null
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TaskScreen(clientId: clientId),
                         ),
-                        const SizedBox(height: 10),
-                        if (addr.isNotEmpty)
-                          Row(
-                            children: [
-                              Icon(Icons.location_on_outlined, size: 18, color: cs.primary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  addr,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Colors.black.withOpacity(0.65)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        if (phone.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.call, size: 18, color: cs.primary),
-                              const SizedBox(width: 8),
-                              Text(phone, style: TextStyle(color: Colors.black.withOpacity(0.65))),
-                            ],
-                          ),
-                        ]
-                      ],
+                      );
+                    },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.black.withOpacity(0.08)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 36,
+                      width: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.business_outlined, size: 18),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name.toUpperCase(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (addr.isNotEmpty)
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  size: 18,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    addr,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.black.withOpacity(0.65),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          if (phone.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.call, size: 18, color: cs.primary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  phone,
+                                  style: TextStyle(
+                                    color: Colors.black.withOpacity(0.65),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -279,7 +334,11 @@ class _ClientScreenState extends ConsumerState<ClientScreen> with SingleTickerPr
     );
   }
 
-  String _str(Map<String, dynamic> m, List<String> keys, {String fallback = ''}) {
+  String _str(
+    Map<String, dynamic> m,
+    List<String> keys, {
+    String fallback = '',
+  }) {
     for (final k in keys) {
       final v = m[k];
       if (v != null) {
