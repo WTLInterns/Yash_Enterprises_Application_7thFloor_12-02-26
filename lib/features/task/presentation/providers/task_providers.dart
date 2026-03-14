@@ -41,6 +41,23 @@ final tasksProvider = FutureProvider<List<dynamic>>((ref) async {
       .getTasksForEmployee(int.parse(employeeId));
 });
 
+final tasksByClientProvider = FutureProvider.family<List<dynamic>, int>((
+  ref,
+  clientId,
+) async {
+  final storage = ref.read(secureStorageProvider);
+  final employeeIdStr = await storage.readEmployeeId();
+  final employeeId = int.tryParse(employeeIdStr ?? '');
+
+  if (employeeId == null) {
+    return [];
+  }
+
+  return ref
+      .read(taskRepositoryProvider)
+      .getTasksForEmployeeAndClient(employeeId, clientId);
+});
+
 // Phase-5: Task animation state provider
 final taskAnimationProvider =
     StateNotifierProvider<TaskAnimationNotifier, Map<String, String>>((ref) {

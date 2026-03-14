@@ -71,17 +71,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await LocalNotificationsService.instance.init();
-
-  // Configure background tracking service (do not auto-start here).
-  await BackgroundTrackingService.configure();
 
   runApp(const ProviderScope(child: UnoloApp()));
 
   // Defer non-critical network connections until after first frame.
   WidgetsBinding.instance.addPostFrameCallback((_) {
+    BackgroundTrackingService.configure();
     WebSocketService.instance.connect();
   });
 }

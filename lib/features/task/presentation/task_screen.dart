@@ -2,14 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../address/presentation/address_edit_request_screen.dart';
+import 'add_task_screen.dart';
 import 'providers/task_providers.dart';
 import '../data/repository/task_repository.dart';
 import '../../../../core/storage/storage_providers.dart';
 import '../../../../core/utils/distance_calculator.dart';
 import '../../../../core/location/location_provider.dart';
 
+String formatStatus(String status) {
+  switch (status) {
+    case 'IN_PROGRESS':
+      return 'In Progress';
+    case 'COMPLETED':
+      return 'Completed';
+    case 'DELAYED':
+      return 'Delayed';
+    case 'CANCELLED':
+      return 'Cancelled';
+    case 'INQUIRY':
+      return 'Inquiry';
+    default:
+      return status.replaceAll('_', ' ');
+  }
+}
+
 class TaskScreen extends ConsumerStatefulWidget {
-  const TaskScreen({super.key});
+  final int? clientId;
+
+  const TaskScreen({super.key, this.clientId});
 
   @override
   ConsumerState<TaskScreen> createState() => _TaskScreenState();
@@ -18,11 +38,16 @@ class TaskScreen extends ConsumerStatefulWidget {
 class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _search = TextEditingController();
   bool _isListeningStarted = false;
+  int _lastLoadedCount = -1;
 
   @override
   void initState() {
     super.initState();
-    ref.read(tasksProvider.future).then((items) {
+    final tasksFuture = widget.clientId != null
+        ? ref.read(tasksByClientProvider(widget.clientId!).future)
+        : ref.read(tasksProvider.future);
+
+    tasksFuture.then((items) {
       final tasksList = items.cast<Map<String, dynamic>>();
       ref
           .read(tasksWithDistanceProvider.notifier)
@@ -34,6 +59,15 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
         ref.read(realTimeTaskNotifierProvider.notifier).startListening();
       }
     });
+  }
+
+  void _syncTasksWithDistance(List<dynamic> items) {
+    final tasksList = items.cast<Map<String, dynamic>>();
+    if (_lastLoadedCount == tasksList.length) return;
+    _lastLoadedCount = tasksList.length;
+    ref
+        .read(tasksWithDistanceProvider.notifier)
+        .loadCustomerAddresses(tasksList);
   }
 
   @override
@@ -72,64 +106,38 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tasksAsync = ref.watch(tasksProvider);
+    final tasksAsync = widget.clientId != null
+        ? ref.watch(tasksByClientProvider(widget.clientId!))
+        : ref.watch(tasksProvider);
+
+    tasksAsync.whenData(_syncTasksWithDistance);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
-        title: const Text('Task'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              children: [
-                InkWell(
-                  onTap: () {},
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Icon(
-                      Icons.list_alt,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                InkWell(
-                  onTap: () {},
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Icon(
-                      Icons.location_on_outlined,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        title: Text(widget.clientId != null ? 'Client Tasks' : 'Task'),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'task_screen_fab',
-        onPressed: () {},
-        backgroundColor: cs.primary,
-        child: const Icon(Icons.add),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   heroTag: 'task_screen_fab',
+      //   onPressed: () async {
+      //     await Navigator.push(
+      //       context,
+      //       MaterialPageRoute(
+      //         builder: (_) => AddTaskScreen(clientId: widget.clientId),
+      //       ),
+      //     );
+
+      //     if (!context.mounted) return;
+
+      //     if (widget.clientId != null) {
+      //       ref.invalidate(tasksByClientProvider(widget.clientId!));
+      //     } else {
+      //       ref.invalidate(tasksProvider);
+      //     }
+      //   },
+      //   backgroundColor: cs.primary,
+      //   child: const Icon(Icons.add),
+      // ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -320,7 +328,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   }
 
   Widget _buildLoadingState() {
-    return Column(
+    return ListView(
       children: [
         const SizedBox(height: 20),
         ...List.generate(
@@ -783,92 +791,99 @@ class AnimatedTaskCard extends ConsumerWidget {
                       ),
                     )
                   else if (taskWithDistance.distanceToCustomer != null)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: taskWithDistance.distanceToCustomer! <= 200
-                              ? [Colors.green.shade50, Colors.green.shade100]
-                              : [Colors.red.shade50, Colors.red.shade100],
+                    Flexible(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: taskWithDistance.distanceToCustomer! <= 200
-                              ? Colors.green.shade200
-                              : Colors.red.shade200,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: taskWithDistance.distanceToCustomer! <= 200
+                                ? [Colors.green.shade50, Colors.green.shade100]
+                                : [Colors.red.shade50, Colors.red.shade100],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
                             color: taskWithDistance.distanceToCustomer! <= 200
-                                ? Colors.green.withOpacity(0.1)
-                                : Colors.red.withOpacity(0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                                ? Colors.green.shade200
+                                : Colors.red.shade200,
+                            width: 1,
                           ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            child: Icon(
-                              taskWithDistance.distanceToCustomer! <= 200
-                                  ? Icons.location_on_rounded
-                                  : Icons.location_off_rounded,
-                              key: ValueKey(
-                                taskWithDistance.distanceToCustomer! <= 200,
-                              ),
-                              size: 18,
+                          boxShadow: [
+                            BoxShadow(
                               color: taskWithDistance.distanceToCustomer! <= 200
-                                  ? Colors.green.shade700
-                                  : Colors.red.shade700,
+                                  ? Colors.green.withOpacity(0.1)
+                                  : Colors.red.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                DistanceCalculator.formatDistance(
-                                  taskWithDistance.distanceToCustomer!,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color:
-                                      taskWithDistance.distanceToCustomer! <=
-                                          200
-                                      ? Colors.green.shade700
-                                      : Colors.red.shade700,
-                                ),
-                              ),
-                              Text(
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              child: Icon(
                                 taskWithDistance.distanceToCustomer! <= 200
-                                    ? 'In Range'
-                                    : 'Out of Range',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color:
-                                      taskWithDistance.distanceToCustomer! <=
-                                          200
-                                      ? Colors.green.shade600
-                                      : Colors.red.shade600,
+                                    ? Icons.location_on_rounded
+                                    : Icons.location_off_rounded,
+                                key: ValueKey(
+                                  taskWithDistance.distanceToCustomer! <= 200,
                                 ),
+                                size: 16,
+                                color:
+                                    taskWithDistance.distanceToCustomer! <= 200
+                                    ? Colors.green.shade700
+                                    : Colors.red.shade700,
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    DistanceCalculator.formatDistance(
+                                      taskWithDistance.distanceToCustomer!,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color:
+                                          taskWithDistance
+                                                  .distanceToCustomer! <=
+                                              200
+                                          ? Colors.green.shade700
+                                          : Colors.red.shade700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    taskWithDistance.distanceToCustomer! <= 200
+                                        ? 'In Range'
+                                        : 'Out of Range',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color:
+                                          taskWithDistance
+                                                  .distanceToCustomer! <=
+                                              200
+                                          ? Colors.green.shade600
+                                          : Colors.red.shade600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  const SizedBox(width: 8),
                   // Animated update button
                   if (task['id'] != null)
                     AnimatedContainer(
@@ -892,26 +907,28 @@ class AnimatedTaskCard extends ConsumerWidget {
                             : 'Outside customer area - Cannot update',
                       ),
                     ),
-                  const SizedBox(width: 8),
                   // Animated status badge
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: AnimatedSwitcher(
+                  IntrinsicWidth(
+                    child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      child: Text(
-                        status,
-                        key: ValueKey(status),
-                        style: TextStyle(
-                          color: statusFg,
-                          fontWeight: FontWeight.w800,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: Text(
+                          formatStatus(status),
+                          key: ValueKey(status),
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: statusFg,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ),
