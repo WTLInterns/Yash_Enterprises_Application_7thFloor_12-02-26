@@ -10,9 +10,18 @@ class AuthApi {
 
   Future<LoginResponse> login(LoginRequest req) async {
     final res = await _dio.post('/auth/login', data: req.toJson());
-    print('🔐 Login Response: ${res.data}');
-    final response = LoginResponse.fromJson(Map<String, dynamic>.from(res.data as Map));
-    print('🔐 Parsed LoginResponse - employeeId: ${response.employeeId}, name: ${response.name}');
+
+    print('===== LOGIN RESPONSE DEBUG =====');
+    print(res.data);
+
+    final response = LoginResponse.fromJson(
+      Map<String, dynamic>.from(res.data as Map),
+    );
+
+    print('EmployeeId from login: ${response.employeeId}');
+    print('Role from login: ${response.role}');
+    print('Department from login: ${response.department}');
+
     return response;
   }
 }

@@ -44,13 +44,11 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
   String? _requestStatus;
 
   // 🚀 Google Maps Reverse Geocoding API (Production-safe, Clean)
-  Future<void> _reverseGeocodeWithGoogle(double lat, double lng) async {
-    const apiKey = String.fromEnvironment('GOOGLE_MAPS_KEY');
-
+  Future<void> _reverseGeocode(double lat, double lng) async {
+    final apiKey = AppConfig.googleMapsApiKey;
     final url = Uri.parse(
       'https://maps.googleapis.com/maps/api/geocode/json'
       '?latlng=$lat,$lng'
-      '&language=en'
       '&key=$apiKey',
     );
 
@@ -65,7 +63,7 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
       final result = data['results'][0];
       final components = result['address_components'] as List;
 
-      String get(String type) {
+      String getComponent(String type) {
         return components.firstWhere(
               (c) => (c['types'] as List).contains(type),
               orElse: () => null,
@@ -73,26 +71,12 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
             '';
       }
 
-      final premise = get('premise');
-      final route = get('route');
-      final subLocality = get('sublocality_level_1');
-      final locality = get('locality');
-
       setState(() {
-        // ✅ CLEAN ADDRESS LINE (short, no duplicates)
-        _addressLineController.text = [
-          premise,
-          route,
-          subLocality,
-          locality,
-        ].where((e) => e.isNotEmpty).take(2).join(', ');
-
-        _cityController.text = locality.isNotEmpty
-            ? locality
-            : get('administrative_area_level_2');
-        _stateController.text = get('administrative_area_level_1');
-        _pincodeController.text = get('postal_code');
-        _countryController.text = get('country');
+        _addressLineController.text = result['formatted_address'] ?? '';
+        _cityController.text = getComponent('locality');
+        _stateController.text = getComponent('administrative_area_level_1');
+        _pincodeController.text = getComponent('postal_code');
+        _countryController.text = getComponent('country');
       });
     } catch (e) {
       debugPrint('Google reverse geocoding failed: $e');
@@ -109,6 +93,17 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
     _pincodeController = TextEditingController();
     _countryController = TextEditingController(text: 'India');
     _reasonController = TextEditingController();
+
+    Future.microtask(() async {
+      print('===== SESSION DATA ON ADDRESS SCREEN =====');
+      final employeeId = await _secureStorage.read(key: 'employee_id');
+      final role = await _secureStorage.read(key: 'user_role');
+      final department = await _secureStorage.read(key: 'user_department');
+      print('employee_id: $employeeId');
+      print('role: $role');
+      print('department: $department');
+    });
+
     _getCurrentLocation();
   }
 
@@ -138,10 +133,9 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
 
       // 🔥 REVERSE GEOCODING - Auto-fill address fields
       try {
-        // Use Google Maps API instead of Android geocoder
-        await _reverseGeocodeWithGoogle(position.latitude, position.longitude);
+        await _reverseGeocode(position.latitude, position.longitude);
       } catch (e) {
-        // If Google API fails, at least we have coordinates
+        // If geocoding fails, at least we have coordinates
         print('Reverse geocoding failed: $e');
       }
     } catch (e) {
@@ -169,29 +163,54 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Get employee ID from secure storage
+      // Get user data from secure storage
       final employeeId = await _secureStorage.read(key: 'employee_id');
+      final userRole = await _secureStorage.read(key: 'user_role');
+      final userDepartment = await _secureStorage.read(key: 'user_department');
+
+      final requestUrl =
+          '${AppConfig.apiBaseUrl}/api/customer-address-edit-requests?employeeId=$employeeId';
+
+      final requestHeaders = {
+        'Content-Type': 'application/json',
+        'X-User-Id': employeeId ?? '',
+        'X-User-Role': userRole ?? 'EMPLOYEE',
+        'X-User-Department': userDepartment?.trim() ?? '',
+      };
+
+      final requestBody = {
+        'addressId': widget.addressId,
+        'addressType': _selectedAddressType,
+        'newAddressLine': _addressLineController.text.trim(),
+        'newCity': _cityController.text.trim(),
+        'newState': _stateController.text.trim(),
+        'newPincode': _pincodeController.text.trim(),
+        'newCountry': _countryController.text.trim(),
+        'newLatitude': _newLatitude,
+        'newLongitude': _newLongitude,
+        'reason': _reasonController.text.trim(),
+      };
+
+      print('===== ADDRESS EDIT REQUEST DEBUG =====');
+      print('EmployeeId: $employeeId');
+      print('Role: $userRole');
+      print('Department: $userDepartment');
+      print('Request URL: $requestUrl');
+      print('Headers:');
+      print('X-User-Id: ${requestHeaders['X-User-Id']}');
+      print('X-User-Role: ${requestHeaders['X-User-Role']}');
+      print('X-User-Department: ${requestHeaders['X-User-Department']}');
+      print('Body:');
+      print(jsonEncode(requestBody));
+
       if (employeeId == null) {
         throw Exception('Employee ID not found. Please login again.');
       }
 
       final response = await http.post(
-        Uri.parse(
-          '${AppConfig.apiBaseUrl}/api/customer-address-edit-requests?employeeId=$employeeId',
-        ),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'addressId': widget.addressId,
-          'addressType': _selectedAddressType,
-          'newAddressLine': _addressLineController.text.trim(),
-          'newCity': _cityController.text.trim(),
-          'newState': _stateController.text.trim(),
-          'newPincode': _pincodeController.text.trim(),
-          'newCountry': _countryController.text.trim(),
-          'newLatitude': _newLatitude,
-          'newLongitude': _newLongitude,
-          'reason': _reasonController.text.trim(),
-        }),
+        Uri.parse(requestUrl),
+        headers: requestHeaders,
+        body: jsonEncode(requestBody),
       );
 
       if (response.statusCode == 200) {

@@ -25,6 +25,8 @@ class WebSocketService {
   final _attendanceController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _taskController = StreamController<Map<String, dynamic>>.broadcast();
+  final _taskStatusController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _punchController = StreamController<Map<String, dynamic>>.broadcast();
   final _adminNotificationController =
       StreamController<Map<String, dynamic>>.broadcast();
@@ -33,6 +35,8 @@ class WebSocketService {
   Stream<Map<String, dynamic>> get attendanceEvents =>
       _attendanceController.stream;
   Stream<Map<String, dynamic>> get taskEvents => _taskController.stream;
+  Stream<Map<String, dynamic>> get taskStatusUpdates =>
+      _taskStatusController.stream;
   Stream<Map<String, dynamic>> get punchEvents => _punchController.stream;
   Stream<Map<String, dynamic>> get adminNotificationStream =>
       _adminNotificationController.stream;
@@ -124,6 +128,21 @@ class WebSocketService {
       );
       _subscriptions['task'] = taskSub;
 
+      final taskStatusSub = _stompClient!.subscribe(
+        destination: '/topic/task-status-updates',
+        callback: (frame) {
+          if (frame.body != null) {
+            try {
+              final data = jsonDecode(frame.body!) as Map<String, dynamic>;
+              _taskStatusController.add(data);
+            } catch (e) {
+              print('Error parsing task status update event: $e');
+            }
+          }
+        },
+      );
+      _subscriptions['taskStatus'] = taskStatusSub;
+
       final punchSub = _stompClient!.subscribe(
         destination: '/topic/punch-events',
         callback: (frame) {
@@ -194,6 +213,7 @@ class WebSocketService {
   void dispose() {
     _attendanceController.close();
     _taskController.close();
+    _taskStatusController.close();
     _punchController.close();
     disconnect();
   }

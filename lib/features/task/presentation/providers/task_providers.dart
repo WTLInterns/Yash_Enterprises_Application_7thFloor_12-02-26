@@ -238,6 +238,16 @@ class TaskWithDistanceNotifier extends StateNotifier<List<TaskWithDistance>> {
       state = newState;
     }
   }
+
+  // Handle real-time task status updates from WebSocket
+  void handleTaskStatusUpdate(Map<String, dynamic> event) {
+    final taskId = event['taskId']?.toString();
+    final status = event['status']?.toString();
+
+    if (taskId != null && status != null) {
+      updateTaskStatus(taskId, status);
+    }
+  }
 }
 
 final tasksWithDistanceProvider =

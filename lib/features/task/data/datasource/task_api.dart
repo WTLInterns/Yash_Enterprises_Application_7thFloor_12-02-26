@@ -47,9 +47,12 @@ class TaskApi {
       final options = Options();
       if (latitude != null && longitude != null) {
         options.headers = {
+          'X-User-Role': 'EMPLOYEE',
           'X-Employee-Latitude': latitude.toString(),
           'X-Employee-Longitude': longitude.toString(),
         };
+      } else {
+        options.headers = {'X-User-Role': 'EMPLOYEE'};
       }
 
       await _dio.put(

@@ -90,33 +90,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
           ),
-          // IconButton(
-          //   onPressed: _logout,
-          //   icon: const Icon(Icons.logout),
-          //   tooltip: 'Logout',
-          // ),
-          // IconButton(
-          //   onPressed: () async {
-          //     try {
-          //       await ref.read(fcmTokenSyncProvider).sync();
-          //       if (mounted) {
-          //         ScaffoldMessenger.of(context).showSnackBar(
-          //           const SnackBar(
-          //             content: Text('FCM Token synced successfully!'),
-          //           ),
-          //         );
-          //       }
-          //     } catch (e) {
-          //       if (mounted) {
-          //         ScaffoldMessenger.of(context).showSnackBar(
-          //           SnackBar(content: Text('FCM sync failed: $e')),
-          //         );
-          //       }
-          //     }
-          //   },
-          //   icon: const Icon(Icons.sync),
-          //   tooltip: 'Sync FCM Token',
-          // ),
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+          ),
+          IconButton(
+            onPressed: () async {
+              try {
+                await ref.read(fcmTokenSyncProvider).sync();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('FCM Token synced successfully!'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('FCM sync failed: $e')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.sync),
+            tooltip: 'Sync FCM Token',
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -124,25 +124,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7F0FF),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.campaign, color: cs.primary),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'How to Edit/Add Clients [Updated] -\nWatch Quick Video Guide.',
-                    ),
-                  ),
-                  const Icon(Icons.play_circle_outline, color: Colors.red),
-                ],
-              ),
-            ),
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(18),

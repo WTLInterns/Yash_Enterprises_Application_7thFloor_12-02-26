@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../address/presentation/address_edit_request_screen.dart';
-import 'add_task_screen.dart';
 import 'providers/task_providers.dart';
-import '../data/repository/task_repository.dart';
 import '../../../../core/storage/storage_providers.dart';
 import '../../../../core/utils/distance_calculator.dart';
 import '../../../../core/location/location_provider.dart';
+import '../../../../core/websocket/websocket_providers.dart';
 
 String formatStatus(String status) {
   switch (status) {
@@ -26,6 +25,24 @@ String formatStatus(String status) {
   }
 }
 
+String _getMonthName(int month) {
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return months[month - 1];
+}
+
 class TaskScreen extends ConsumerStatefulWidget {
   final int? clientId;
 
@@ -39,6 +56,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _search = TextEditingController();
   bool _isListeningStarted = false;
   int _lastLoadedCount = -1;
+  DateTime _selectedMonth = DateTime.now();
 
   @override
   void initState() {
@@ -53,11 +71,36 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
           .read(tasksWithDistanceProvider.notifier)
           .loadCustomerAddresses(tasksList);
     });
+
+    // Initialize location tracking for task updates
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isListeningStarted) {
         _isListeningStarted = true;
         ref.read(realTimeTaskNotifierProvider.notifier).startListening();
       }
+
+      // Initialize location provider to ensure GPS is available for task updates
+      ref.read(locationTrackingProvider.notifier).initialize();
+
+      // Listen for real-time task events
+      ref.listen(taskEventsProvider, (_, event) {
+        // Invalidate task providers to refresh data
+        if (widget.clientId != null) {
+          ref.invalidate(tasksByClientProvider(widget.clientId!));
+        } else {
+          ref.invalidate(tasksProvider);
+        }
+      });
+
+      // Listen for real-time task status updates
+      ref.listen(taskStatusUpdatesProvider, (_, event) {
+        event.whenData((data) {
+          // Update local state without full refresh
+          ref
+              .read(tasksWithDistanceProvider.notifier)
+              .handleTaskStatusUpdate(data);
+        });
+      });
     });
   }
 
@@ -142,48 +185,37 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 10,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.campaign, color: cs.primary),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'How to Edit/Add Clients [Updated] -\nWatch Quick Video Guide.',
-                      style: TextStyle(
-                        color: Color(0xFF2F6FED),
-                        fontWeight: FontWeight.w600,
-                        height: 1.15,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.play_circle_outline, color: Colors.red),
-                ],
-              ),
-            ),
             const SizedBox(height: 12),
             Row(
               children: [
                 const Icon(Icons.calendar_month),
                 const SizedBox(width: 6),
-                const Text(
-                  'Today',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedMonth,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+
+                    if (picked != null) {
+                      setState(() {
+                        _selectedMonth = DateTime(picked.year, picked.month);
+                      });
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      Text(
+                        '${_getMonthName(_selectedMonth.month)} ${_selectedMonth.year}',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.keyboard_arrow_down),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.keyboard_arrow_down),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -195,9 +227,33 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.black.withOpacity(0.08)),
                   ),
-                  child: const Text(
-                    '1 Task',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  child: Builder(
+                    builder: (context) {
+                      final tasksAsync = widget.clientId != null
+                          ? ref.watch(tasksByClientProvider(widget.clientId!))
+                          : ref.watch(tasksProvider);
+
+                      return tasksAsync.when(
+                        loading: () => const Text('Loading...'),
+                        error: (_, __) => const Text('Error'),
+                        data: (items) {
+                          final monthTasks = items.where((task) {
+                            final dateStr =
+                                task['startDate'] ?? task['taskDate'];
+                            if (dateStr == null) return false;
+                            final taskDate = DateTime.tryParse(dateStr);
+                            return taskDate != null &&
+                                taskDate.year == _selectedMonth.year &&
+                                taskDate.month == _selectedMonth.month;
+                          }).toList();
+
+                          return Text(
+                            "${monthTasks.length} Task${monthTasks.length == 1 ? '' : 's'}",
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -255,10 +311,29 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                     tasksWithDistanceProvider,
                   );
 
+                  // Filter tasks by selected month
+                  final monthTasks = items.where((task) {
+                    final dateStr = task['startDate'] ?? task['taskDate'];
+                    if (dateStr == null) return false;
+                    final taskDate = DateTime.tryParse(dateStr);
+                    return taskDate != null &&
+                        taskDate.year == _selectedMonth.year &&
+                        taskDate.month == _selectedMonth.month;
+                  }).toList();
+
+                  // Get corresponding TaskWithDistance objects
+                  final monthTasksWithDistance = tasksWithDistance.where((
+                    taskWithDistance,
+                  ) {
+                    return monthTasks.any(
+                      (task) => task['id'] == taskWithDistance.task['id'],
+                    );
+                  }).toList();
+
                   final q = _search.text.trim().toLowerCase();
                   final filtered = q.isEmpty
-                      ? tasksWithDistance
-                      : tasksWithDistance.where((e) {
+                      ? monthTasksWithDistance
+                      : monthTasksWithDistance.where((e) {
                           final title =
                               (e.task['title'] ?? e.task['name'] ?? '')
                                   .toString();
@@ -538,9 +613,10 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                       ? int.tryParse(employeeIdStr) ?? 1
                       : 1;
 
-                  // Get current location from existing provider
-                  final locationState = ref.read(locationTrackingProvider);
-                  final currentPosition = locationState.currentPosition;
+                  // Ensure fresh location is available for task update
+                  final currentPosition = await ref
+                      .read(locationTrackingProvider.notifier)
+                      .ensureLocationAvailable();
 
                   if (currentPosition == null) {
                     throw Exception(
@@ -565,8 +641,8 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                         longitude: longitude,
                       );
 
-                  // Refresh tasks
-                  await ref.read(tasksProvider.future);
+                  // Real-time WebSocket updates will handle UI refresh automatically
+                  // No manual provider invalidation needed
 
                   if (context.mounted) {
                     Navigator.pop(context);
@@ -623,7 +699,10 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
           children: [
             Icon(Icons.location_off, color: Colors.red),
             SizedBox(width: 8),
-            Text('Location Restriction'),
+            Text(
+              'Location Restriction',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
@@ -750,48 +829,57 @@ class AnimatedTaskCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      assignedBy,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const Spacer(),
-                  // Distance display with animation
-                  if (taskWithDistance.isLoadingAddress)
-                    Container(
+                  Flexible(
+                    child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 10,
+                        vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.grey.shade100, Colors.grey.shade200],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.grey.shade300),
+                        color: Colors.black.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                      child: const SizedBox(
-                        width: 60,
-                        height: 16,
-                        child: LinearProgressIndicator(
-                          backgroundColor: Colors.transparent,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.grey,
+                      child: Text(
+                        assignedBy,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Distance display with animation
+                  if (taskWithDistance.isLoadingAddress)
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.grey.shade100,
+                              Colors.grey.shade200,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: const SizedBox(
+                          width: 60,
+                          height: 16,
+                          child: LinearProgressIndicator(
+                            backgroundColor: Colors.transparent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.grey,
+                            ),
                           ),
                         ),
                       ),
                     )
                   else if (taskWithDistance.distanceToCustomer != null)
-                    Flexible(
+                    Expanded(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         padding: const EdgeInsets.symmetric(
@@ -908,27 +996,26 @@ class AnimatedTaskCard extends ConsumerWidget {
                       ),
                     ),
                   // Animated status badge
-                  IntrinsicWidth(
-                    child: AnimatedContainer(
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: Text(
-                          formatStatus(status),
-                          key: ValueKey(status),
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: statusFg,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      child: Text(
+                        formatStatus(status),
+                        key: ValueKey(status),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: statusFg,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),

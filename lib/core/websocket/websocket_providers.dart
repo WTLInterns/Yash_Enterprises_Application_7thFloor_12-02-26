@@ -17,12 +17,19 @@ final taskEventsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   return webSocketService.taskEvents;
 });
 
+final taskStatusUpdatesProvider = StreamProvider<Map<String, dynamic>>((ref) {
+  final webSocketService = ref.watch(webSocketServiceProvider);
+  return webSocketService.taskStatusUpdates;
+});
+
 final punchEventsProvider = StreamProvider<Map<String, dynamic>>((ref) {
   final webSocketService = ref.watch(webSocketServiceProvider);
   return webSocketService.punchEvents;
 });
 
-final adminNotificationEventsProvider = StreamProvider<Map<String, dynamic>>((ref) {
+final adminNotificationEventsProvider = StreamProvider<Map<String, dynamic>>((
+  ref,
+) {
   final webSocketService = ref.watch(webSocketServiceProvider);
   return webSocketService.adminNotificationStream;
 });

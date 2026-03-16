@@ -24,10 +24,13 @@ class TaskRepository {
     double? latitude,
     double? longitude,
   }) async {
-    // Note: Location headers are not currently supported by updateTaskStatus API
-    // This method signature kept for future enhancement
-
-    await _api.updateTaskStatus(id, status, employeeId);
+    await _api.updateTaskStatus(
+      id,
+      status,
+      employeeId,
+      latitude: latitude,
+      longitude: longitude,
+    );
   }
 
   Future<void> deleteTask(int id) => _api.deleteTask(id);

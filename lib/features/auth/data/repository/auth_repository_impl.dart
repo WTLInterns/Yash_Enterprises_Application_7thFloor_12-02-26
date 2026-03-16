@@ -3,9 +3,11 @@ import '../datasource/auth_api.dart';
 import '../models/login_request.dart';
 
 class AuthRepositoryImpl {
-  AuthRepositoryImpl({required AuthApi api, required SecureSessionStorage storage})
-      : _api = api,
-        _storage = storage;
+  AuthRepositoryImpl({
+    required AuthApi api,
+    required SecureSessionStorage storage,
+  }) : _api = api,
+       _storage = storage;
 
   final AuthApi _api;
   final SecureSessionStorage _storage;
@@ -16,7 +18,11 @@ class AuthRepositoryImpl {
     required String password,
   }) async {
     final resp = await _api.login(
-      LoginRequest(organization: organization, email: email, password: password),
+      LoginRequest(
+        organization: organization,
+        email: email,
+        password: password,
+      ),
     );
 
     await _storage.saveSession(
@@ -24,6 +30,7 @@ class AuthRepositoryImpl {
       employeeId: resp.employeeId,
       name: resp.name,
       role: resp.role,
+      department: resp.department,
       profileImage: resp.profileImage,
     );
   }

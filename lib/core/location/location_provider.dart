@@ -15,6 +15,17 @@ class LocationTrackingState {
   // Add getter for compatibility
   Map<String, dynamic>? get currentPosition => lastKnownPosition;
 
+  // Add helper method to check if location is fresh
+  bool get isLocationFresh {
+    if (lastUpdateTime == null || lastKnownPosition == null) return false;
+
+    final lastUpdate = DateTime.tryParse(lastUpdateTime!);
+    if (lastUpdate == null) return false;
+
+    // Consider location fresh if updated within last 2 minutes
+    return DateTime.now().difference(lastUpdate).inMinutes < 2;
+  }
+
   LocationTrackingState({
     this.isTracking = false,
     this.isInitialized = false,
@@ -134,6 +145,20 @@ class LocationTrackingNotifier extends StateNotifier<LocationTrackingState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  // Ensure location is available and fresh before API calls
+  Future<Map<String, dynamic>?> ensureLocationAvailable() async {
+    // If location is fresh, return it immediately
+    if (state.isLocationFresh && state.currentPosition != null) {
+      return state.currentPosition;
+    }
+
+    // Otherwise, update location
+    await updateStatus();
+
+    // Return updated location
+    return state.currentPosition;
   }
 }
 
