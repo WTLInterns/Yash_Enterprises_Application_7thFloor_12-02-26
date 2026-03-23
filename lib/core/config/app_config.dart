@@ -1,7 +1,7 @@
 class AppConfig {
   /// Base API URL (change when switching environments)
 
-  static const String apiBaseUrl = "http://192.168.1.105:8080";
+  static const String apiBaseUrl = "http://192.168.1.101:8080";
 
   /// REST API base
   static String get apiUrl => "$apiBaseUrl/api";

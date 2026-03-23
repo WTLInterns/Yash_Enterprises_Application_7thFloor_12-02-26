@@ -12,7 +12,7 @@ class AuthService {
   final Dio _dio = Dio(
     BaseOptions(
 
-      baseUrl: 'http://192.168.1.105:8080/api',
+      baseUrl: 'http://192.168.1.101:8080/api',
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {'Content-Type': 'application/json'},

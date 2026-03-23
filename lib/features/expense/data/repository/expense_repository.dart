@@ -6,6 +6,7 @@ class ExpenseRepository {
   final ExpenseApi _api;
 
   Future<List<dynamic>> getExpenses() => _api.listExpenses();
+  Future<List<dynamic>> getExpensesWithFilters(String endpoint) => _api.listExpensesWithFilters(endpoint);
   Future<Map<String, dynamic>> getExpense(int id) => _api.getExpense(id);
   Future<Map<String, dynamic>> createExpense(Map<String, dynamic> payload) => _api.createExpense(payload);
   Future<void> updateExpense(int id, Map<String, dynamic> payload) => _api.updateExpense(id, payload);
