@@ -10,6 +10,11 @@ class ExpenseApi {
     return (res.data as List).cast();
   }
 
+  Future<List<dynamic>> listExpensesWithFilters(String endpoint) async {
+    final res = await _dio.get(endpoint);
+    return (res.data as List).cast();
+  }
+
   Future<Map<String, dynamic>> getExpense(int id) async {
     final res = await _dio.get('/expenses/$id');
     return Map<String, dynamic>.from(res.data as Map);

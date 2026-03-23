@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../app/router/route_names.dart';
+import '../../../../core/config/app_config.dart';
 import 'providers/expense_providers.dart';
 
 class ExpenseScreen extends ConsumerStatefulWidget {
@@ -18,7 +20,7 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this);
+    _tab = TabController(length: 1, vsync: this);
   }
 
   @override
@@ -30,6 +32,7 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final expensesAsync = ref.watch(expensesProvider);
+    final selectedMonth = ref.watch(selectedMonthProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -39,8 +42,6 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
           controller: _tab,
           tabs: const [
             Tab(text: 'Expense'),
-            Tab(text: 'Conveyance'),
-            Tab(text: 'Advance'),
           ],
         ),
       ),
@@ -56,18 +57,40 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
               children: [
                 const Icon(Icons.calendar_month),
                 const SizedBox(width: 8),
-                const Text('January 2026', style: TextStyle(fontWeight: FontWeight.w800)),
+                Text(
+                  DateFormat('MMMM yyyy').format(selectedMonth),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Month'),
-                      SizedBox(width: 6),
-                      Icon(Icons.keyboard_arrow_down),
-                    ],
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedMonth,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+
+                    if (picked != null) {
+                      ref.read(selectedMonthProvider.notifier).state = picked;
+                      // Refresh expenses with new month
+                      ref.refresh(expensesProvider);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Month'),
+                        const SizedBox(width: 6),
+                        Icon(Icons.keyboard_arrow_down),
+                      ],
+                    ),
                   ),
                 )
               ],
@@ -128,8 +151,12 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                           final category = (m['category'] ?? 'Expense').toString();
                           final desc = (m['description'] ?? '').toString();
                           final date = (m['expenseDate'] ?? '').toString();
-                          final amount = (m['amount'] ?? 0).toString();
+                          final time = (m['expenseTime'] ?? '').toString();
+                          final amount = (m['amount'] ?? 0).toDouble();
                           final status = (m['status'] ?? 'Pending').toString();
+                          final employeeName = (m['employeeName'] ?? '').toString();
+                          final departmentName = (m['departmentName'] ?? '').toString();
+                          final receiptUrl = (m['receiptUrl'] ?? '').toString();
 
                           return Card(
                             child: Padding(
@@ -137,6 +164,7 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  /// Category + Status
                                   Row(
                                     children: [
                                       Text(category, style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -144,19 +172,105 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                                       Text(status, style: TextStyle(color: Colors.black.withOpacity(0.6))),
                                     ],
                                   ),
+
+                                  const SizedBox(height: 6),
+
+                                  /// Employee + Department
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.person, size: 16),
+                                      const SizedBox(width: 6),
+                                      Text(employeeName.isEmpty ? 'Unknown Employee' : employeeName),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        departmentName.isEmpty ? '(No Department)' : '($departmentName)',
+                                        style: const TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+
+                                  /// Description
                                   if (desc.isNotEmpty) ...[
                                     const SizedBox(height: 6),
                                     Text(desc, style: TextStyle(color: Colors.black.withOpacity(0.65))),
                                   ],
-                                  const SizedBox(height: 10),
+
+                                  const SizedBox(height: 8),
+
+                                  /// Date + Time
                                   Row(
                                     children: [
                                       const Icon(Icons.calendar_month, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: Text(date.isEmpty ? '-' : date)),
-                                      Text('₹ $amount', style: const TextStyle(fontWeight: FontWeight.w900)),
+                                      const SizedBox(width: 6),
+                                      Text(date.isEmpty ? '-' : date),
+                                      const SizedBox(width: 10),
+                                      Text(time.isEmpty ? '' : time),
                                     ],
                                   ),
+
+                                  const SizedBox(height: 8),
+
+                                  /// Amount
+                                  Text(
+                                    '₹ ${amount.toStringAsFixed(0)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  /// Evidence Image/File
+                                  if (receiptUrl.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => Dialog(
+                                            backgroundColor: Colors.transparent,
+                                            child: GestureDetector(
+                                              onTap: () => Navigator.of(context).pop(),
+                                              child: InteractiveViewer(
+                                                child: Image.network(
+                                                  "${AppConfig.apiBaseUrl}$receiptUrl",
+                                                  fit: BoxFit.contain,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.network(
+                                          "${AppConfig.apiBaseUrl}$receiptUrl",
+                                          height: 120,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                          loadingBuilder: (context, child, progress) {
+                                            if (progress == null) return child;
+                                            return const SizedBox(
+                                              height: 120,
+                                              child: Center(child: CircularProgressIndicator()),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              height: 120,
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: const Center(
+                                                child: Text("No evidence available"),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -165,8 +279,6 @@ class _ExpenseScreenState extends ConsumerState<ExpenseScreen> with SingleTicker
                       );
                     },
                   ),
-                  const _EmptyState(),
-                  const _EmptyState(),
                 ],
               ),
             ),
