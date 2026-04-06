@@ -12,6 +12,7 @@ class RouteNames {
   static const expense = 'expense';
 
   static const addExpense = '/expense/add';
+  static const applyLeave = '/leave/apply';
 
   static const notifications = '/notifications';
 }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../attendance/presentation/providers/attendance_providers.dart';
 import '../../attendance/presentation/widgets/attendance_table_widget.dart';
+import '../../leave/presentation/screens/leave_list_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -19,7 +20,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 1, vsync: this);
+    _tab = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -91,7 +92,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           labelStyle: const TextStyle(fontWeight: FontWeight.w800),
           tabs: const [
             Tab(text: 'Attendance'),
-            // Tab(text: 'Shift'),
+            Tab(text: 'Leave'),
           ],
         ),
       ),
@@ -103,7 +104,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             onMonthChange: (m) =>
                 ref.read(selectedAttendanceMonthProvider.notifier).state = m,
           ),
-          // _ShiftTab(),
+          const LeaveListScreen(),
         ],
       ),
     );

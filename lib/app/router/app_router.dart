@@ -7,6 +7,7 @@ import '../../features/onboarding/presentation/screens/language_screen.dart';
 import '../../features/onboarding/presentation/screens/permissions_screen.dart';
 import '../../features/shell/presentation/shell_screen.dart';
 import '../../features/expense/presentation/screens/add_expense_screen.dart';
+import '../../features/leave/presentation/screens/apply_leave_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import 'route_names.dart';
 
@@ -52,6 +53,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.addExpense,
         builder: (context, state) => const AddExpenseScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.applyLeave,
+        builder: (context, state) => const ApplyLeaveScreen(),
       ),
       GoRoute(
         path: RouteNames.shell,
