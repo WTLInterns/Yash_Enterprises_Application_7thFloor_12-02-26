@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../../../../core/storage/storage_providers.dart';
+import '../../../client/presentation/providers/client_providers.dart';
 import '../providers/expense_providers.dart';
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
@@ -15,7 +17,11 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpenseItem {
-  _ExpenseItem({required this.type, required this.amount, required this.remarks});
+  _ExpenseItem({
+    required this.type,
+    required this.amount,
+    required this.remarks,
+  });
 
   String type;
   String amount;
@@ -25,6 +31,7 @@ class _ExpenseItem {
 class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _desc = TextEditingController();
   DateTime? _date;
+  int? _selectedClientId;
   final List<_ExpenseItem> _items = [
     _ExpenseItem(type: 'Accommodation', amount: '', remarks: ''),
   ];
@@ -69,6 +76,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final clientsAsync = ref.watch(clientsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
@@ -94,11 +102,71 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              clientsAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: LinearProgressIndicator(),
+                ),
+                error: (e, _) => Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.black.withOpacity(0.08)),
+                  ),
+                  child: const Text('Failed to load clients'),
+                ),
+                data: (items) {
+                  final clients = items
+                      .whereType<Map>()
+                      .map((e) => Map<String, dynamic>.from(e))
+                      .toList();
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.black.withOpacity(0.08)),
+                    ),
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedClientId,
+                      isExpanded: true,
+                      items: clients
+                          .map((c) {
+                            final id = c['id'];
+                            if (id is! int) return null;
+                            final name =
+                                (c['name'] ?? c['clientName'] ?? 'Client $id')
+                                    .toString();
+                            return DropdownMenuItem<int>(
+                              value: id,
+                              child: Text(
+                                name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          })
+                          .whereType<DropdownMenuItem<int>>()
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedClientId = v),
+                      decoration: const InputDecoration(
+                        labelText: 'Client (optional)',
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
               InkWell(
                 onTap: _pickDate,
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -107,7 +175,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   child: Row(
                     children: [
                       Text(
-                        _date == null ? 'Select date' : '${_date!.day}/${_date!.month}/${_date!.year}',
+                        _date == null
+                            ? 'Select date'
+                            : '${_date!.day}/${_date!.month}/${_date!.year}',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const Spacer(),
@@ -117,7 +187,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Text('Expense items', style: TextStyle(fontWeight: FontWeight.w900)),
+              const Text(
+                'Expense items',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
               const SizedBox(height: 10),
               ...List.generate(_items.length, (index) {
                 final item = _items[index];
@@ -134,30 +207,41 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       children: [
                         DropdownButtonFormField<String>(
                           value: item.type,
-                          items: const [
-                            'Accommodation',
-                            'DM Order',
-                            'Meals',
-                            'Others',
-                            'Out Of Pocket',
-                            'Traveling'
-                          ]
-                              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                              .toList(),
-                          onChanged: (v) => setState(() => item.type = v ?? item.type),
+                          items:
+                              const [
+                                    'Accommodation',
+                                    'DM Order',
+                                    'Meals',
+                                    'Others',
+                                    'Out Of Pocket',
+                                    'Traveling',
+                                  ]
+                                  .map(
+                                    (e) => DropdownMenuItem(
+                                      value: e,
+                                      child: Text(e),
+                                    ),
+                                  )
+                                  .toList(),
+                          onChanged: (v) =>
+                              setState(() => item.type = v ?? item.type),
                           decoration: const InputDecoration(labelText: 'Type'),
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
                           initialValue: item.amount,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Amount'),
+                          decoration: const InputDecoration(
+                            labelText: 'Amount',
+                          ),
                           onChanged: (v) => setState(() => item.amount = v),
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
                           initialValue: item.remarks,
-                          decoration: const InputDecoration(labelText: 'Remarks (optional)'),
+                          decoration: const InputDecoration(
+                            labelText: 'Remarks (optional)',
+                          ),
                           onChanged: (v) => setState(() => item.remarks = v),
                         ),
                       ],
@@ -167,7 +251,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               }),
               const SizedBox(height: 10),
               OutlinedButton.icon(
-                onPressed: () => setState(() => _items.add(_ExpenseItem(type: 'Accommodation', amount: '', remarks: ''))),
+                onPressed: () => setState(
+                  () => _items.add(
+                    _ExpenseItem(
+                      type: 'Accommodation',
+                      amount: '',
+                      remarks: '',
+                    ),
+                  ),
+                ),
                 icon: const Icon(Icons.add),
                 label: const Text('Add another item'),
               ),
@@ -181,9 +273,18 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Text('Total Expense', style: TextStyle(fontWeight: FontWeight.w900)),
+                    const Text(
+                      'Total Expense',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
                     const Spacer(),
-                    Text('₹${total.toStringAsFixed(2)}', style: TextStyle(color: cs.primary, fontWeight: FontWeight.w900)),
+                    Text(
+                      '₹${total.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -191,7 +292,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               OutlinedButton.icon(
                 onPressed: _pickEvidence,
                 icon: const Icon(Icons.attach_file),
-                label: Text(_evidence == null ? 'Add Evidence' : 'Evidence Selected'),
+                label: Text(
+                  _evidence == null ? 'Add Evidence' : 'Evidence Selected',
+                ),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -206,7 +309,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         )
                       : const Text('Submit'),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -217,23 +320,33 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Future<void> _submit() async {
     if (_submitting) return;
 
-    final employeeIdRaw = await ref.read(secureSessionStorageProvider).readEmployeeId();
+    final employeeIdRaw = await ref
+        .read(secureSessionStorageProvider)
+        .readEmployeeId();
     final employeeId = int.tryParse(employeeIdRaw ?? '');
     if (employeeId == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Employee not found. Please login again.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Employee not found. Please login again.'),
+        ),
+      );
       return;
     }
 
     if (_date == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select date')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select date')));
       return;
     }
 
     if (total <= 0) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter amount')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter amount')));
       return;
     }
 
@@ -244,23 +357,50 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         'amount': total,
         'category': _items.isNotEmpty ? _items.first.type : 'Expense',
         'description': _desc.text.trim(),
-        'expenseDate': '${_date!.year.toString().padLeft(4, '0')}-${_date!.month.toString().padLeft(2, '0')}-${_date!.day.toString().padLeft(2, '0')}',
+        'expenseDate':
+            '${_date!.year.toString().padLeft(4, '0')}-${_date!.month.toString().padLeft(2, '0')}-${_date!.day.toString().padLeft(2, '0')}',
         'status': 'PENDING',
+        'clientId': _selectedClientId,
       };
 
-      final created = await ref.read(expenseRepositoryProvider).createExpense(payload);
-      final createdId = created['id'] is num ? (created['id'] as num).toInt() : int.tryParse('${created['id']}');
+      final created = await ref
+          .read(expenseRepositoryProvider)
+          .createExpense(payload);
+      final createdId = created['id'] is num
+          ? (created['id'] as num).toInt()
+          : int.tryParse('${created['id']}');
 
       if (createdId != null && _evidence != null) {
-        await ref.read(expenseRepositoryProvider).uploadEvidence(createdId, _evidence!.path);
+        await ref
+            .read(expenseRepositoryProvider)
+            .uploadEvidence(createdId, _evidence!.path);
       }
 
       ref.invalidate(expensesProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to submit expense')));
+      String message;
+      if (e is DioException) {
+        final status = e.response?.statusCode;
+        final data = e.response?.data;
+        if (data is Map) {
+          final m = Map<String, dynamic>.from(data);
+          message = (m['description'] ?? m['message'] ?? m['error'] ?? '')
+              .toString();
+          if (message.trim().isEmpty) {
+            message = 'Request failed (${status ?? 'unknown'})';
+          }
+        } else {
+          message = 'Request failed (${status ?? 'unknown'})';
+        }
+      } else {
+        message = e.toString();
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

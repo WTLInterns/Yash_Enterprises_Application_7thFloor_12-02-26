@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../providers/leave_providers.dart';
@@ -11,10 +13,12 @@ class LeaveListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final leavesAsync = ref.watch(myLeavesProvider);
+    final selectedMonth = ref.watch(selectedLeaveMonthProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'leave_fab',
         onPressed: () => context.push(RouteNames.applyLeave),
         child: const Icon(Icons.add),
       ),
@@ -22,61 +26,126 @@ class LeaveListScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: leavesAsync.when(
           data: (leaves) {
-            if (leaves.isEmpty) {
-              return const Center(child: Text('No leaves found.'));
-            }
-
-            return ListView.separated(
-              itemCount: leaves.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) {
-                final l = leaves[i];
-                final type = (l['leaveType'] ?? '').toString();
-                final from = (l['fromDate'] ?? '').toString();
-                final to = (l['toDate'] ?? '').toString();
-                final status = (l['status'] ?? '').toString();
-                final reason = (l['reason'] ?? '').toString();
-
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month),
+                    const SizedBox(width: 8),
+                    Text(
+                      DateFormat('MMMM yyyy').format(selectedMonth),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedMonth,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null) {
+                          ref.read(selectedLeaveMonthProvider.notifier).state =
+                              picked;
+                          ref.invalidate(myLeavesProvider);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Expanded(
-                              child: Text(
-                                type.isNotEmpty ? type : 'Leave',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                            _StatusChip(status: status),
+                            Text('Month'),
+                            SizedBox(width: 6),
+                            Icon(Icons.keyboard_arrow_down),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text('From: $from'),
-                        Text('To: $to'),
-                        if (reason.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text('Reason: $reason'),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: leaves.isEmpty
+                      ? const Center(child: Text('No leaves found.'))
+                      : ListView.separated(
+                          itemCount: leaves.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, i) {
+                            final l = leaves[i];
+                            final type = (l['leaveType'] ?? '').toString();
+                            final from = (l['fromDate'] ?? '').toString();
+                            final to = (l['toDate'] ?? '').toString();
+                            final status = (l['status'] ?? '').toString();
+                            final reason = (l['reason'] ?? '').toString();
+
+                            return Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            type.isNotEmpty ? type : 'Leave',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                        _StatusChip(status: status),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text('From: $from'),
+                                    Text('To: $to'),
+                                    if (reason.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text('Reason: $reason'),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => const Center(child: Text('Failed to load leaves')),
+          error: (e, _) {
+            if (kDebugMode) {
+              print('LeaveListScreen error: $e');
+            }
+            final msg = _friendlyErrorMessage(e);
+            return Center(child: Text(msg));
+          },
         ),
       ),
     );
   }
+}
+
+String _friendlyErrorMessage(Object e) {
+  final raw = e.toString();
+  if (raw.toLowerCase().contains('user data missing')) {
+    return 'User data missing';
+  }
+  if (raw.trim().isNotEmpty) return raw;
+  return 'Failed to load leaves';
 }
 
 class _StatusChip extends StatelessWidget {

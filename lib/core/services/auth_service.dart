@@ -11,7 +11,7 @@ class AuthService {
   final _secureStorage = const FlutterSecureStorage();
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: 'http://172.16.2.34:8080/api',
+      baseUrl: 'https://api.yashrajent.com/api',
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {'Content-Type': 'application/json'},

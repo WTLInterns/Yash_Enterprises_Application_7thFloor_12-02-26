@@ -1,7 +1,7 @@
 class AppConfig {
   /// Base API URL (change when switching environments)
 
-  static const String apiBaseUrl = "http://172.16.2.34:8080";
+  static const String apiBaseUrl = "https://api.yashrajent.com";
 
   /// REST API base
   static String get apiUrl => "$apiBaseUrl/api";
@@ -18,5 +18,6 @@ class AppConfig {
   }
 
   /// Google Maps API
-  static const String googleMapsApiKey = 'AIzaSyDuZC6kFobB0pnp-k3VcxQIjvb0EhgfnVI';
+  static const String googleMapsApiKey =
+      'AIzaSyDuZC6kFobB0pnp-k3VcxQIjvb0EhgfnVI';
 }

@@ -55,8 +55,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
-        title: const Text('Home'),
+        leading: IconButton(
+          icon: const Icon(Icons.logout_outlined),
+          onPressed: _logout,
+        ),
+        title: const Center(
+          child: Text(
+            'Home',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: () => context.push(RouteNames.notifications),
@@ -90,34 +98,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
           ),
-          IconButton(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-          ),
-          IconButton(
-            onPressed: () async {
-              try {
-                await ref.read(fcmTokenSyncProvider).sync();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('FCM Token synced successfully!'),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('FCM sync failed: $e')),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sync FCM Token',
-          ),
-          const SizedBox(width: 8),
+          // IconButton(
+          //   onPressed: _logout,
+          //   icon: const Icon(Icons.logout),
+          //   tooltip: 'Logout',
+          // ),
+          // IconButton(
+          //   onPressed: () async {
+          //     try {
+          //       await ref.read(fcmTokenSyncProvider).sync();
+          //       if (mounted) {
+          //         ScaffoldMessenger.of(context).showSnackBar(
+          //           const SnackBar(
+          //             content: Text('FCM Token synced successfully!'),
+          //           ),
+          //         );
+          //       }
+          //     } catch (e) {
+          //       if (mounted) {
+          //         ScaffoldMessenger.of(context).showSnackBar(
+          //           SnackBar(content: Text('FCM sync failed: $e')),
+          //         );
+          //       }
+          //     }
+          //   },
+          //   icon: const Icon(Icons.sync),
+          //   tooltip: 'Sync FCM Token',
+          // ),
+          // const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
@@ -142,60 +150,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 12),
             // FCM Token Display
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.phone_android, color: cs.primary, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'FCM Token',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: _getFcmToken,
-                        icon: const Icon(Icons.refresh, size: 18),
-                        tooltip: 'Refresh Token',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (_fcmToken != null)
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: SelectableText(
-                        _fcmToken!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    )
-                  else
-                    const Text(
-                      'Loading FCM Token...',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                ],
-              ),
-            ),
+            // Container(
+            //   padding: const EdgeInsets.all(12),
+            //   decoration: BoxDecoration(
+            //     color: Colors.grey.shade100,
+            //     borderRadius: BorderRadius.circular(14),
+            //     border: Border.all(color: Colors.grey.shade300),
+            //   ),
+            //   child: Column(
+            //     crossAxisAlignment: CrossAxisAlignment.start,
+            //     children: [
+            //       Row(
+            //         children: [
+            //           Icon(Icons.phone_android, color: cs.primary, size: 20),
+            //           const SizedBox(width: 8),
+            //           const Text(
+            //             'FCM Token',
+            //             style: TextStyle(
+            //               fontWeight: FontWeight.bold,
+            //               fontSize: 14,
+            //             ),
+            //           ),
+            //           const Spacer(),
+            //           IconButton(
+            //             onPressed: _getFcmToken,
+            //             icon: const Icon(Icons.refresh, size: 18),
+            //             tooltip: 'Refresh Token',
+            //           ),
+            //         ],
+            //       ),
+            //       const SizedBox(height: 8),
+            //       if (_fcmToken != null)
+            //         Container(
+            //           padding: const EdgeInsets.all(8),
+            //           decoration: BoxDecoration(
+            //             color: Colors.white,
+            //             borderRadius: BorderRadius.circular(8),
+            //             border: Border.all(color: Colors.grey.shade200),
+            //           ),
+            //           child: SelectableText(
+            //             _fcmToken!,
+            //             style: const TextStyle(
+            //               fontSize: 12,
+            //               fontFamily: 'monospace',
+            //             ),
+            //           ),
+            //         )
+            //       else
+            //         const Text(
+            //           'Loading FCM Token...',
+            //           style: TextStyle(color: Colors.grey),
+            //         ),
+            //     ],
+            //   ),
+            // ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -266,9 +274,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         GestureDetector(
                           onTap: punch.loading
                               ? null
-                              : () => ref
-                                    .read(punchControllerProvider.notifier)
-                                    .punchIn(),
+                              : () async {
+                                  try {
+                                    await ref
+                                        .read(punchControllerProvider.notifier)
+                                        .punchIn();
+                                  } catch (e) {
+                                    if (mounted) {
+                                      final message = e
+                                          .toString()
+                                          .replaceAll('Exception: ', '')
+                                          .trim();
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(message),
+                                          backgroundColor: Colors.red.shade600,
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
                           child: Container(
                             height: 46,
                             width: 46,

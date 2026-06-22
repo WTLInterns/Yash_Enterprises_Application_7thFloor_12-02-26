@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../address/presentation/address_edit_request_screen.dart';
+import '../../documents/presentation/documents_screen.dart';
 import 'providers/task_providers.dart';
 import '../../../../core/storage/storage_providers.dart';
 import '../../../../core/utils/distance_calculator.dart';
@@ -25,6 +26,45 @@ String formatStatus(String status) {
   }
 }
 
+/// Formats a scheduledStartTime / scheduledEndTime ISO string (e.g. "2026-03-15T09:30:00")
+/// into a readable "09:30 AM" display string. Returns '' on null / parse failure.
+String _formatScheduledTime(String? raw) {
+  if (raw == null || raw.isEmpty) return '';
+  final dt = DateTime.tryParse(raw);
+  if (dt == null) return '';
+  final hh = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final mm = dt.minute.toString().padLeft(2, '0');
+  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+  return '$hh:$mm $ampm';
+}
+
+DateTime? _extractBestTaskDate(Map<String, dynamic> task) {
+  final raw =
+      task['startDate'] ?? task['scheduledStartTime'] ?? task['taskDate'];
+  if (raw == null) return null;
+  return DateTime.tryParse(raw.toString());
+}
+
+String _formatDateOnly(DateTime dt) {
+  final dd = dt.day.toString().padLeft(2, '0');
+  return '$dd ${_getMonthAbbrev(dt.month)} ${dt.year}';
+}
+
+String _formatDateTime(DateTime dt) {
+  final date = _formatDateOnly(dt);
+  final time = _formatScheduledTime(dt.toIso8601String());
+  if (time.isEmpty) return date;
+  return '$date $time';
+}
+
+String _formatBestTaskDateLabel(Map<String, dynamic> task) {
+  final dt = _extractBestTaskDate(task);
+  if (dt == null) return '';
+  final usedScheduled =
+      task['startDate'] == null && task['scheduledStartTime'] != null;
+  return usedScheduled ? _formatDateTime(dt) : _formatDateOnly(dt);
+}
+
 String _getMonthName(int month) {
   const months = [
     'January',
@@ -43,6 +83,24 @@ String _getMonthName(int month) {
   return months[month - 1];
 }
 
+String _getMonthAbbrev(int month) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return months[month - 1];
+}
+
 class TaskScreen extends ConsumerStatefulWidget {
   final int? clientId;
 
@@ -54,63 +112,69 @@ class TaskScreen extends ConsumerStatefulWidget {
 
 class _TaskScreenState extends ConsumerState<TaskScreen> {
   final _search = TextEditingController();
-  bool _isListeningStarted = false;
   int _lastLoadedCount = -1;
   DateTime _selectedMonth = DateTime.now();
+  bool _isSyncingTasksWithDistance = false;
+  bool _didRegisterListeners = false;
+
+  static const bool _debugLogs = true;
+
+  void _log(String message) {
+    if (!_debugLogs) return;
+    print('[TaskScreen] $message');
+  }
 
   @override
   void initState() {
     super.initState();
-    final tasksFuture = widget.clientId != null
-        ? ref.read(tasksByClientProvider(widget.clientId!).future)
-        : ref.read(tasksProvider.future);
+    Future.microtask(() async {
+      _log(
+        'initState: clientId=${widget.clientId} selectedMonth=$_selectedMonth',
+      );
+      final items = widget.clientId != null
+          ? await ref.read(tasksByClientProvider(widget.clientId!).future)
+          : await ref.read(tasksProvider.future);
 
-    tasksFuture.then((items) {
-      final tasksList = items.cast<Map<String, dynamic>>();
-      ref
-          .read(tasksWithDistanceProvider.notifier)
-          .loadCustomerAddresses(tasksList);
+      _log('initState: initial fetch returned items.length=${items.length}');
+      if (items.isNotEmpty && items.first is Map) {
+        final first = Map<String, dynamic>.from(items.first as Map);
+        _log(
+          'initState: first item sample id=${first['id']} clientId=${first['clientId']} startDate=${first['startDate']} scheduledStartTime=${first['scheduledStartTime']} taskName=${first['taskName']}',
+        );
+        _log('initState: first item keys=${first.keys.toList()}');
+      }
+      await _syncTasksWithDistance(items);
     });
 
-    // Initialize location tracking for task updates
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isListeningStarted) {
-        _isListeningStarted = true;
-        ref.read(realTimeTaskNotifierProvider.notifier).startListening();
-      }
-
-      // Initialize location provider to ensure GPS is available for task updates
       ref.read(locationTrackingProvider.notifier).initialize();
-
-      // Listen for real-time task events
-      ref.listen(taskEventsProvider, (_, event) {
-        // Invalidate task providers to refresh data
-        if (widget.clientId != null) {
-          ref.invalidate(tasksByClientProvider(widget.clientId!));
-        } else {
-          ref.invalidate(tasksProvider);
-        }
-      });
-
-      // Listen for real-time task status updates
-      ref.listen(taskStatusUpdatesProvider, (_, event) {
-        event.whenData((data) {
-          // Update local state without full refresh
-          ref
-              .read(tasksWithDistanceProvider.notifier)
-              .handleTaskStatusUpdate(data);
-        });
-      });
+      ref.read(realTimeTaskNotifierProvider.notifier).startListening();
     });
   }
 
-  void _syncTasksWithDistance(List<dynamic> items) {
+  Future<void> _syncTasksWithDistance(List<dynamic> items) async {
     final tasksList = items.cast<Map<String, dynamic>>();
+    _log(
+      '_syncTasksWithDistance: items.length=${items.length} tasksList.length=${tasksList.length} lastLoadedCount=$_lastLoadedCount isSyncing=$_isSyncingTasksWithDistance',
+    );
     if (_lastLoadedCount == tasksList.length) return;
+    if (_isSyncingTasksWithDistance) return;
     _lastLoadedCount = tasksList.length;
-    ref
-        .read(tasksWithDistanceProvider.notifier)
-        .loadCustomerAddresses(tasksList);
+    _isSyncingTasksWithDistance = true;
+    try {
+      _log(
+        '_syncTasksWithDistance: loading customer addresses for ${tasksList.length} tasks',
+      );
+      await ref
+          .read(tasksWithDistanceProvider.notifier)
+          .loadCustomerAddresses(tasksList);
+      final after = ref.read(tasksWithDistanceProvider);
+      _log(
+        '_syncTasksWithDistance: tasksWithDistanceProvider.length(after)=${after.length}',
+      );
+    } finally {
+      _isSyncingTasksWithDistance = false;
+    }
   }
 
   @override
@@ -149,16 +213,58 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    _log(
+      'build: clientId=${widget.clientId} selectedMonth=$_selectedMonth search="${_search.text}"',
+    );
+    final tasksListenable = widget.clientId != null
+        ? tasksByClientProvider(widget.clientId!)
+        : tasksProvider;
+
+    if (!_didRegisterListeners) {
+      _didRegisterListeners = true;
+
+      ref.listen<AsyncValue<List<dynamic>>>(tasksListenable, (previous, next) {
+        next.whenData((items) {
+          Future.microtask(() => _syncTasksWithDistance(items));
+        });
+      });
+
+      ref.listen(taskStatusUpdatesProvider, (_, event) {
+        event.whenData((data) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ref
+                .read(tasksWithDistanceProvider.notifier)
+                .handleTaskStatusUpdate(data);
+          });
+        });
+      });
+    }
+
     final tasksAsync = widget.clientId != null
         ? ref.watch(tasksByClientProvider(widget.clientId!))
         : ref.watch(tasksProvider);
-
-    tasksAsync.whenData(_syncTasksWithDistance);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
         title: Text(widget.clientId != null ? 'Client Tasks' : 'Task'),
+        actions: [
+          if (widget.clientId != null)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        DocumentsScreen(customerId: widget.clientId!),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.folder_open_outlined),
+              label: const Text('Documents'),
+            ),
+        ],
       ),
       // floatingActionButton: FloatingActionButton(
       //   heroTag: 'task_screen_fab',
@@ -237,15 +343,19 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                         loading: () => const Text('Loading...'),
                         error: (_, __) => const Text('Error'),
                         data: (items) {
+                          _log('badge: items.length=${items.length}');
                           final monthTasks = items.where((task) {
-                            final dateStr =
-                                task['startDate'] ?? task['taskDate'];
-                            if (dateStr == null) return false;
-                            final taskDate = DateTime.tryParse(dateStr);
-                            return taskDate != null &&
-                                taskDate.year == _selectedMonth.year &&
-                                taskDate.month == _selectedMonth.month;
+                            if (task is! Map) return false;
+                            final m = Map<String, dynamic>.from(task as Map);
+                            final dt = _extractBestTaskDate(m);
+                            return dt != null &&
+                                dt.year == _selectedMonth.year &&
+                                dt.month == _selectedMonth.month;
                           }).toList();
+
+                          _log(
+                            'badge: monthTasks.length=${monthTasks.length} (selectedMonth=$_selectedMonth)',
+                          );
 
                           return Text(
                             "${monthTasks.length} Task${monthTasks.length == 1 ? '' : 's'}",
@@ -307,40 +417,100 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                 loading: () => _buildLoadingState(),
                 error: (e, _) => _buildErrorState(e),
                 data: (items) {
+                  _log('list: raw items.length=${items.length}');
+                  if (items.isNotEmpty && items.first is Map) {
+                    final first = Map<String, dynamic>.from(items.first as Map);
+                    _log(
+                      'list: first item sample id=${first['id']} clientId=${first['clientId']} startDate=${first['startDate']} scheduledStartTime=${first['scheduledStartTime']} taskName=${first['taskName']}',
+                    );
+                  }
+
                   final tasksWithDistance = ref.watch(
                     tasksWithDistanceProvider,
                   );
 
+                  _log(
+                    'list: tasksWithDistanceProvider.length=${tasksWithDistance.length}',
+                  );
+
                   // Filter tasks by selected month
-                  final monthTasks = items.where((task) {
-                    final dateStr = task['startDate'] ?? task['taskDate'];
-                    if (dateStr == null) return false;
-                    final taskDate = DateTime.tryParse(dateStr);
-                    return taskDate != null &&
-                        taskDate.year == _selectedMonth.year &&
-                        taskDate.month == _selectedMonth.month;
-                  }).toList();
+                  int droppedNullDate = 0;
+                  int droppedParseFail = 0;
+                  int droppedMonthMismatch = 0;
+
+                  final monthTasks = <dynamic>[];
+                  for (final task in items) {
+                    if (task is! Map) {
+                      continue;
+                    }
+                    final m = Map<String, dynamic>.from(task as Map);
+                    final dt = _extractBestTaskDate(m);
+                    if (dt == null) {
+                      droppedNullDate++;
+                      final id = m['id'];
+                      _log(
+                        'filter(drop): id=$id reason=startDate/scheduledStartTime/taskDate is null',
+                      );
+                      continue;
+                    }
+                    final ok =
+                        dt.year == _selectedMonth.year &&
+                        dt.month == _selectedMonth.month;
+                    if (!ok) {
+                      droppedMonthMismatch++;
+                      continue;
+                    }
+                    monthTasks.add(m);
+                  }
+
+                  _log(
+                    'filter(month): received=${items.length} kept=${monthTasks.length} droppedNullDate=$droppedNullDate droppedParseFail=$droppedParseFail droppedMonthMismatch=$droppedMonthMismatch',
+                  );
 
                   // Get corresponding TaskWithDistance objects
-                  final monthTasksWithDistance = tasksWithDistance.where((
-                    taskWithDistance,
-                  ) {
-                    return monthTasks.any(
-                      (task) => task['id'] == taskWithDistance.task['id'],
+                  final monthTasksWithDistance = monthTasks.map((t) {
+                    final id = (t is Map) ? t['id'] : null;
+                    if (id == null) {
+                      return TaskWithDistance(
+                        task: (t is Map)
+                            ? Map<String, dynamic>.from(t as Map)
+                            : <String, dynamic>{},
+                        isLoadingAddress: true,
+                      );
+                    }
+                    final idx = tasksWithDistance.indexWhere(
+                      (e) => e.task['id'] == id,
+                    );
+                    if (idx != -1) return tasksWithDistance[idx];
+                    return TaskWithDistance(
+                      task: Map<String, dynamic>.from(t as Map),
+                      isLoadingAddress: true,
                     );
                   }).toList();
+
+                  _log(
+                    'intersection: monthTasks=${monthTasks.length} monthTasksWithDistance=${monthTasksWithDistance.length}',
+                  );
 
                   final q = _search.text.trim().toLowerCase();
                   final filtered = q.isEmpty
                       ? monthTasksWithDistance
                       : monthTasksWithDistance.where((e) {
-                          final title =
-                              (e.task['title'] ?? e.task['name'] ?? '')
-                                  .toString();
+                          final title = (e.task['taskName'] ?? '').toString();
                           final client = (e.task['clientName'] ?? '')
                               .toString();
                           return (title + client).toLowerCase().contains(q);
                         }).toList();
+
+                  _log(
+                    'final: searchQuery="${_search.text}" filtered.length=${filtered.length}',
+                  );
+
+                  if (items.isNotEmpty && filtered.isEmpty) {
+                    _log(
+                      'UI DROPPED DATA: items existed but final list is empty',
+                    );
+                  }
 
                   return ListView.builder(
                     itemCount: filtered.length,
@@ -348,16 +518,26 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
                       final taskWithDistance = filtered[index];
                       final task = taskWithDistance.task;
 
-                      final title = (task['title'] ?? task['name'] ?? 'Task')
-                          .toString();
+                      final title = (task['taskName'] ?? 'Task').toString();
                       final assignedBy =
                           (task['createdByEmployeeName'] ?? 'Admin Assigned')
                               .toString();
                       final status = (task['status'] ?? 'Pending').toString();
-                      final date = (task['startDate'] ?? task['taskDate'] ?? '')
-                          .toString();
-                      final time = (task['startTime'] ?? '').toString();
-                      final time2 = (task['endTime'] ?? '').toString();
+                      if (_debugLogs) {
+                        debugPrint("[TaskUI] taskName=${task['taskName']}");
+                        debugPrint(
+                          "[TaskUI] taskDescription=${task['taskDescription']}",
+                        );
+                        debugPrint("[TaskUI] startDate=${task['startDate']}");
+                        debugPrint("[TaskUI] endDate=${task['endDate']}");
+                      }
+                      final date = _formatBestTaskDateLabel(task);
+                      final time = _formatScheduledTime(
+                        task['scheduledStartTime']?.toString(),
+                      );
+                      final time2 = _formatScheduledTime(
+                        task['scheduledEndTime']?.toString(),
+                      );
                       final assignee = (task['assignedToEmployeeName'] ?? '')
                           .toString();
 
@@ -525,7 +705,9 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
     final statusController = TextEditingController(
       text: task['status'] ?? 'INQUIRY',
     );
-    final titleController = TextEditingController(text: task['title'] ?? '');
+    final titleController = TextEditingController(
+      text: (task['taskName'] ?? '').toString(),
+    );
     String selectedStatus = task['status'] ?? 'INQUIRY';
 
     // Backend enum values - must match exactly
@@ -549,7 +731,7 @@ class _TaskScreenState extends ConsumerState<TaskScreen> {
           maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
         child: AlertDialog(
-          title: Text('Update Task: ${task['title'] ?? ''}'),
+          title: Text('Update Task: ${(task['taskName'] ?? '').toString()}'),
           content: SizedBox(
             width: double.maxFinite,
             child: StatefulBuilder(
@@ -800,10 +982,50 @@ class AnimatedTaskCard extends ConsumerWidget {
   final VoidCallback onLocationRestriction;
   final VoidCallback onAddressEdit;
 
+  // ── Time Taken color helper ─────────────────────────────────────────────
+  Color _timeTakenColor(String timeTaken) {
+    final hMatch = RegExp(r'(\d+)h').firstMatch(timeTaken);
+    final mMatch = RegExp(r'(\d+)m').firstMatch(timeTaken);
+    final h = hMatch != null ? int.tryParse(hMatch.group(1)!) ?? 0 : 0;
+    final m = mMatch != null ? int.tryParse(mMatch.group(1)!) ?? 0 : 0;
+    final total = h * 60 + m;
+    if (total <= 60) return Colors.green.shade700;
+    if (total <= 120) return Colors.orange.shade700;
+    return Colors.red.shade700;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final taskId = task['id']?.toString() ?? '';
     final animationType = ref.watch(taskAnimationProvider)[taskId];
+
+    // Read timeTaken directly from backend-computed field in TaskDto
+    final timeTaken = task['timeTaken']?.toString();
+    final hasTimeTaken = timeTaken != null && timeTaken.isNotEmpty;
+
+    final description = (task['taskDescription'] ?? '').toString().trim();
+    final hasDescription = description.isNotEmpty;
+
+    final startDateRaw = task['startDate']?.toString();
+    final endDateRaw = task['endDate']?.toString();
+    final startDateDt = startDateRaw != null && startDateRaw.isNotEmpty
+        ? DateTime.tryParse(startDateRaw)
+        : null;
+    final endDateDt = endDateRaw != null && endDateRaw.isNotEmpty
+        ? DateTime.tryParse(endDateRaw)
+        : null;
+
+    final startDateLabel = startDateDt != null
+        ? _formatDateOnly(startDateDt)
+        : '';
+    final endDateLabel = endDateDt != null ? _formatDateOnly(endDateDt) : '';
+
+    final startTimeLabel = _formatScheduledTime(
+      task['scheduledStartTime']?.toString(),
+    );
+    final endTimeLabel = _formatScheduledTime(
+      task['scheduledEndTime']?.toString(),
+    );
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1034,22 +1256,82 @@ class AnimatedTaskCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              if (date.isNotEmpty)
+              const SizedBox(height: 6),
+              Text(
+                hasDescription ? description : 'No Description',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (startDateLabel.isNotEmpty) ...[
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     const Icon(Icons.calendar_today, size: 18),
                     const SizedBox(width: 8),
-                    Text(date),
+                    Expanded(child: Text('Start Date: $startDateLabel')),
                   ],
                 ),
-              if (time.isNotEmpty || time2.isNotEmpty) ...[
+              ],
+              if (startTimeLabel.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     const Icon(Icons.access_time, size: 18),
                     const SizedBox(width: 8),
-                    Text(time2.isNotEmpty ? '$time – $time2' : time),
+                    Expanded(child: Text('Start Time: $startTimeLabel')),
+                  ],
+                ),
+              ],
+              if (endDateLabel.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('End Date: $endDateLabel')),
+                  ],
+                ),
+              ],
+              if (endTimeLabel.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('End Time: $endTimeLabel')),
+                  ],
+                ),
+              ],
+              if (hasTimeTaken) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 18,
+                      color: _timeTakenColor(timeTaken!),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Time Taken: ',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      timeTaken!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: _timeTakenColor(timeTaken!),
+                      ),
+                    ),
                   ],
                 ),
               ],

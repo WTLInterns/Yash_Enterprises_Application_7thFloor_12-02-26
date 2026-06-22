@@ -54,9 +54,14 @@ class _PunchScreenState extends ConsumerState<PunchScreen>
   Future<void> _handlePunchIn() async {
     HapticFeedback.lightImpact();
     await _scaleController.forward();
-    await ref.read(punchControllerProvider.notifier).punchIn();
-    await _scaleController.reverse();
-    _showSuccessToast('Punched In Successfully!');
+    try {
+      await ref.read(punchControllerProvider.notifier).punchIn();
+      await _scaleController.reverse();
+      _showSuccessToast('Punched In Successfully!');
+    } catch (e) {
+      await _scaleController.reverse();
+      _showErrorToast(e.toString().replaceAll('Exception: ', '').trim());
+    }
   }
 
   Future<void> _handlePunchOut() async {

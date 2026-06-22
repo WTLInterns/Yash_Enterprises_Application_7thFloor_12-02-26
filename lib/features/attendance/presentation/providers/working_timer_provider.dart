@@ -29,35 +29,31 @@ class WorkingTimerController extends StateNotifier<WorkingTimerState> {
 
   final Ref _ref;
   Timer? _timer;
-  DateTime? _startedAt;
 
   void _listenToPunchState() {
     _ref.listen<PunchState>(punchControllerProvider, (prev, next) {
-      if (next.isPunchedIn && !state.running) {
-        start();
+      if (next.isPunchedIn && next.punchInTime != null && !state.running) {
+        startFromBackendTime(next.punchInTime!);
       } else if (!next.isPunchedIn && state.running) {
         stop();
       }
     });
   }
 
-  void start() {
-    _startedAt ??= DateTime.now();
+  void startFromBackendTime(DateTime punchInTime) {
     state = state.copyWith(running: true);
 
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final startedAt = _startedAt;
-      if (startedAt == null) return;
-      state = state.copyWith(elapsed: DateTime.now().difference(startedAt));
+      // Calculate elapsed time from backend punchInTime
+      final elapsed = DateTime.now().difference(punchInTime);
+      state = state.copyWith(elapsed: elapsed);
     });
   }
 
   void stop() {
     _timer?.cancel();
     _timer = null;
-
-    _startedAt = null;
     state = state.copyWith(running: false, elapsed: Duration.zero);
   }
 

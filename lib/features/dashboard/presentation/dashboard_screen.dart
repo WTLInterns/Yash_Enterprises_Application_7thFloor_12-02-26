@@ -37,8 +37,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
-        title: const Text('Attendance Records'),
+        title: const Center(child: Text('Attendance Records')),
         // actions: [
         //   Padding(
         //     padding: const EdgeInsets.only(right: 8),
@@ -181,8 +180,23 @@ class _AttendanceTab extends ConsumerWidget {
           const SizedBox(height: 12),
           attendanceAsync.when(
             data: (records) {
+              final sortedRecords = [...records]
+                ..sort((a, b) {
+                  final ad = DateTime.tryParse(
+                    (a['date']?.toString() ?? '').trim(),
+                  );
+                  final bd = DateTime.tryParse(
+                    (b['date']?.toString() ?? '').trim(),
+                  );
+                  if (ad == null && bd == null) return 0;
+                  if (ad == null) return 1;
+                  if (bd == null) return -1;
+                  return bd.compareTo(ad);
+                });
+
               final counts = <String, int>{
                 'PRESENT': 0,
+                'LATE': 0,
                 'HALF_DAY': 0,
                 'ABSENT': 0,
                 'ON_LEAVE': 0,
@@ -191,11 +205,23 @@ class _AttendanceTab extends ConsumerWidget {
                 'WEEKLY_OFF': 0,
               };
 
-              for (final r in records) {
+              for (final r in sortedRecords) {
                 final raw = (r['status']?.toString() ?? '')
                     .trim()
                     .toUpperCase();
-                if (counts.containsKey(raw)) {
+                final punchIn = DateTime.tryParse(
+                  (r['punchInTime']?.toString() ?? '').trim(),
+                );
+
+                final derivedLate =
+                    raw == 'PRESENT' &&
+                    punchIn != null &&
+                    (punchIn.hour > 10 ||
+                        (punchIn.hour == 10 && punchIn.minute > 0));
+
+                if (raw == 'LATE' || derivedLate) {
+                  counts['LATE'] = (counts['LATE'] ?? 0) + 1;
+                } else if (counts.containsKey(raw)) {
                   counts[raw] = (counts[raw] ?? 0) + 1;
                 }
               }
@@ -234,7 +260,7 @@ class _AttendanceTab extends ConsumerWidget {
                         Colors.blueGrey,
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(child: SizedBox.shrink()),
+                      _counter('Late', '${counts['LATE']}', Colors.deepOrange),
                       const SizedBox(width: 10),
                       const Expanded(child: SizedBox.shrink()),
                     ],
@@ -257,7 +283,20 @@ class _AttendanceTab extends ConsumerWidget {
                         child: Text('No attendance found for this month.'),
                       );
                     }
-                    return AttendanceTableWidget(records: records);
+                    final sortedRecords = [...records]
+                      ..sort((a, b) {
+                        final ad = DateTime.tryParse(
+                          (a['date']?.toString() ?? '').trim(),
+                        );
+                        final bd = DateTime.tryParse(
+                          (b['date']?.toString() ?? '').trim(),
+                        );
+                        if (ad == null && bd == null) return 0;
+                        if (ad == null) return 1;
+                        if (bd == null) return -1;
+                        return bd.compareTo(ad);
+                      });
+                    return AttendanceTableWidget(records: sortedRecords);
                   },
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),

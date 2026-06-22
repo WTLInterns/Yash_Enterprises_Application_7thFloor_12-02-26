@@ -9,14 +9,22 @@ import 'fcm_providers.dart';
 
 final fcmRuntimeProvider = Provider<void>((ref) {
   Future<void> handleMessage(RemoteMessage message) async {
-    final title = message.notification?.title ?? (message.data['title']?.toString() ?? 'Notification');
-    
-    // Use formatted message from data payload if available
-    String body = message.data['message']?.toString() ?? 
-                 message.notification?.body ?? 
-                 (message.data['body']?.toString() ?? '');
+    final stableId = message.messageId ?? message.data['messageId']?.toString();
+    final title =
+        message.notification?.title ??
+        (message.data['title']?.toString() ?? 'Notification');
 
-    await ref.read(notificationsControllerProvider.notifier).add(
+    // Use formatted message from data payload if available
+    String body =
+        message.data['message']?.toString() ??
+        message.notification?.body ??
+        (message.data['body']?.toString() ?? '');
+
+    print('[NotificationBadge] fcm_foreground messageId=$stableId');
+    await ref
+        .read(notificationsControllerProvider.notifier)
+        .add(
+          id: stableId,
           title: title,
           body: body,
           data: Map<String, dynamic>.from(message.data),
@@ -27,7 +35,8 @@ final fcmRuntimeProvider = Provider<void>((ref) {
       id: Random().nextInt(1 << 30),
       title: title,
       body: body,
-      payload: message.data['message']?.toString(), // Pass full message for BigTextStyle
+      payload: message.data['message']
+          ?.toString(), // Pass full message for BigTextStyle
     );
   }
 

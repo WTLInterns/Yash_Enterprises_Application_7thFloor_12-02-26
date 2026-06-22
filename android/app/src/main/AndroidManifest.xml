@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="YashEnterprisesApp"
-        android:name="${applicationName}"
+        android:name=".MainApplication"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">

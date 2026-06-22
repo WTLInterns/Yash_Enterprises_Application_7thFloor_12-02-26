@@ -5,13 +5,37 @@ class TaskApi {
 
   final Dio _dio;
 
+  static const bool _debugLogs = true;
+
+  void _log(String message) {
+    if (!_debugLogs) return;
+    print('[TaskApi] $message');
+  }
+
   Future<List<dynamic>> listTasks() async {
     final res = await _dio.get('/tasks');
     return (res.data as List).cast();
   }
 
   Future<List<dynamic>> getTasksForEmployee(int employeeId) async {
+    _log('GET /tasks/employee/$employeeId');
     final res = await _dio.get('/tasks/employee/$employeeId');
+    _log('Response status=${res.statusCode}');
+    _log('Response runtimeType=${res.data.runtimeType}');
+    if (res.data is List) {
+      final list = (res.data as List).cast();
+      _log('Response length=${list.length}');
+      if (list.isNotEmpty) {
+        final first = list.first;
+        _log('First item runtimeType=${first.runtimeType}');
+        if (first is Map) {
+          final keys = Map<String, dynamic>.from(first as Map).keys.toList();
+          _log('First item keys=$keys');
+        }
+      }
+      return list;
+    }
+    _log('Unexpected response shape: ${res.data}');
     return (res.data as List).cast();
   }
 
@@ -19,7 +43,29 @@ class TaskApi {
     int employeeId,
     int clientId,
   ) async {
+    _log('GET /tasks/client/$clientId/employee/$employeeId');
+    _log('Params clientId=$clientId employeeId=$employeeId');
     final res = await _dio.get('/tasks/client/$clientId/employee/$employeeId');
+    _log('Response status=${res.statusCode}');
+    _log('Response runtimeType=${res.data.runtimeType}');
+    if (res.data is List) {
+      final list = (res.data as List).cast();
+      _log('Response length=${list.length}');
+      if (list.isNotEmpty) {
+        final first = list.first;
+        _log('First item runtimeType=${first.runtimeType}');
+        if (first is Map) {
+          final m = Map<String, dynamic>.from(first as Map);
+          _log('First item keys=${m.keys.toList()}');
+          _log(
+            'First item sample id=${m['id']} taskName=${m['taskName']} startDate=${m['startDate']} scheduledStartTime=${m['scheduledStartTime']}',
+          );
+        }
+      }
+      return list;
+    }
+
+    _log('Unexpected response shape: ${res.data}');
     return (res.data as List).cast();
   }
 

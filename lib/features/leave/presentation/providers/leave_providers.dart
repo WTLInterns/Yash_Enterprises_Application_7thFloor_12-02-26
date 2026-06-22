@@ -16,8 +16,17 @@ final leaveRepositoryProvider = Provider<LeaveRepository>((ref) {
   );
 });
 
-final myLeavesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  return ref.watch(leaveRepositoryProvider).listMyLeaves();
+final selectedLeaveMonthProvider = StateProvider<DateTime>((ref) {
+  return DateTime.now();
+});
+
+final myLeavesProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
+  final selectedMonth = ref.watch(selectedLeaveMonthProvider);
+  return ref
+      .watch(leaveRepositoryProvider)
+      .listMyLeaves(month: selectedMonth.month, year: selectedMonth.year);
 });
 
 class ApplyLeaveState {
@@ -27,10 +36,7 @@ class ApplyLeaveState {
   final String? error;
 
   ApplyLeaveState copyWith({bool? loading, String? error}) {
-    return ApplyLeaveState(
-      loading: loading ?? this.loading,
-      error: error,
-    );
+    return ApplyLeaveState(loading: loading ?? this.loading, error: error);
   }
 }
 
@@ -47,7 +53,9 @@ class ApplyLeaveController extends StateNotifier<ApplyLeaveState> {
   }) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      await _ref.read(leaveRepositoryProvider).applyLeave(
+      await _ref
+          .read(leaveRepositoryProvider)
+          .applyLeave(
             leaveType: leaveType,
             fromDate: fromDate,
             toDate: toDate,
@@ -63,5 +71,5 @@ class ApplyLeaveController extends StateNotifier<ApplyLeaveState> {
 
 final applyLeaveControllerProvider =
     StateNotifierProvider<ApplyLeaveController, ApplyLeaveState>((ref) {
-  return ApplyLeaveController(ref);
-});
+      return ApplyLeaveController(ref);
+    });

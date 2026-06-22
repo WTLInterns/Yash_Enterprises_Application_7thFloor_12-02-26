@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/route_names.dart';
 import '../../../../core/notifications/fcm_providers.dart';
 import '../../../../core/storage/storage_providers.dart';
 import '../../../../core/utils/ui_feedback.dart';
+import '../../../../core/network/dio_error_handler.dart';
 import '../../../../features/task/presentation/providers/task_providers.dart';
 import '../providers/auth_providers.dart';
 import '../providers/session_provider.dart';
@@ -21,19 +21,16 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _organizationController = TextEditingController();
 
   bool _loading = false;
   bool _obscurePassword = true;
   bool _emailFocused = false;
   bool _passwordFocused = false;
-  bool _organizationFocused = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _organizationController.dispose();
     super.dispose();
   }
 
@@ -42,9 +39,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    final organization = _organizationController.text.trim();
 
-    if (email.isEmpty || password.isEmpty || organization.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       UiFeedback.snack(context, 'Please fill all fields');
       return;
     }
@@ -57,25 +53,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      await ref
+      print('🔐 LOGIN: Starting authentication...');
+
+      // 1. Call API and get response
+      final response = await ref
           .read(authRepositoryProvider)
-          .login(organization: organization, email: email, password: password);
-      await ref.read(sessionProvider).refresh();
-      await ref.read(fcmTokenSyncProvider).sync();
+          .login(email: email, password: password);
+      print('✅ LOGIN: API success - employeeId=${response.employeeId}');
 
-      // Set employee ID for real-time filtering from secure storage
-      final storage = ref.read(secureStorageProvider);
-      final employeeId = await storage.readEmployeeId();
-      if (employeeId != null) {
-        ref.read(currentEmployeeIdProvider.notifier).state = employeeId;
-      }
+      if (!mounted) return;
 
-      if (mounted) context.go(RouteNames.shell);
+      // 2. IMMEDIATELY update in-memory session state (SYNCHRONOUS)
+      ref
+          .read(sessionProvider)
+          .setSession(
+            token: response.token,
+            employeeId: response.employeeId,
+            name: response.name,
+            role: response.role,
+            department: response.department, // 🚨 ADD MISSING DEPARTMENT
+          );
+      print(
+        '===== LOGIN SCREEN SESSION UPDATE =====',
+      );
+      print('isLoggedIn: ${ref.read(sessionProvider).isLoggedIn}');
+      print('employeeId: "${ref.read(sessionProvider).employeeId}"');
+      print('role: "${ref.read(sessionProvider).role}"');
+      print('department: "${ref.read(sessionProvider).department}"'); // 🚨 LOG DEPARTMENT
+
+      // 3. Set employeeId provider for other features
+      ref.read(currentEmployeeIdProvider.notifier).state = response.employeeId;
+
+      // 4. Router will automatically redirect to /app via GoRouter redirect logic
+      // NO manual navigation needed - state change triggers redirect
+      print('✅ LOGIN: Complete - router will handle navigation');
+
+      // 5. Background tasks (non-blocking)
+      Future.microtask(() async {
+        try {
+          await ref.read(fcmTokenSyncProvider).sync();
+          print('✅ FCM token synced');
+        } catch (e) {
+          print('⚠️ FCM sync error (non-critical): $e');
+        }
+      });
     } on DioException catch (e) {
-      final msg = e.response?.data?.toString() ?? e.message ?? "Network error";
-      UiFeedback.snack(context, "Login failed: $msg");
+      print('❌ LOGIN ERROR (DioException): $e');
+      if (mounted)
+        UiFeedback.snack(context, 'Login failed: ${handleDioError(e)}');
     } catch (e) {
-      UiFeedback.snack(context, "Login failed: $e");
+      print('❌ LOGIN ERROR: $e');
+      if (mounted) {
+        UiFeedback.snack(
+          context,
+          'Login failed: ${e.toString().replaceAll('Exception: ', '').trim()}',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -193,15 +226,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 28),
-
-                        /// ORGANIZATION
-                        _inputField(
-                          controller: _organizationController,
-                          hint: "Organization",
-                          icon: Icons.business_outlined,
-                          obscure: false,
-                        ),
-                        const SizedBox(height: 16),
 
                         /// EMAIL
                         _inputField(

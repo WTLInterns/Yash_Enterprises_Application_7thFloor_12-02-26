@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/providers/session_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/onboarding/presentation/screens/language_screen.dart';
 import '../../features/onboarding/presentation/screens/permissions_screen.dart';
 import '../../features/shell/presentation/shell_screen.dart';
 import '../../features/expense/presentation/screens/add_expense_screen.dart';
@@ -18,30 +17,44 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: RouteNames.login,
     refreshListenable: session,
     redirect: (context, state) {
-      // Only redirect if session is initialized
-      if (!session.initialized) return null;
-
+      final initialized = session.initialized;
       final loggedIn = session.isLoggedIn;
-      final goingToLogin = state.matchedLocation == RouteNames.login;
-      final goingToOnboarding =
-          // state.matchedLocation == RouteNames.language ||
-          state.matchedLocation == RouteNames.permissions;
+      final location = state.matchedLocation;
 
+      print(
+        '📡 ROUTER: initialized=$initialized, loggedIn=$loggedIn, location=$location',
+      );
+
+      // Wait for session initialization
+      if (!initialized) {
+        print('📡 ROUTER: Waiting for session init...');
+        return null;
+      }
+
+      final goingToLogin = location == RouteNames.login;
+      final goingToOnboarding = location == RouteNames.permissions;
+      // NOTE: protected routes are enforced via redirect rules below.
+
+      // Not logged in - redirect to login
       if (!loggedIn) {
-        // allow onboarding + login
-        if (goingToOnboarding || goingToLogin) return null;
+        if (goingToLogin || goingToOnboarding) {
+          print('📡 ROUTER: Allowing access to public route');
+          return null;
+        }
+        print('📡 ROUTER: Not logged in - redirecting to login');
         return RouteNames.login;
       }
 
-      // logged in
-      if (goingToLogin || goingToOnboarding) return RouteNames.shell;
+      // Logged in - redirect away from login/onboarding
+      if (goingToLogin || goingToOnboarding) {
+        print('📡 ROUTER: Logged in - redirecting to shell');
+        return RouteNames.shell;
+      }
+
+      print('📡 ROUTER: No redirect needed');
       return null;
     },
     routes: [
-      // GoRoute(
-      //   path: RouteNames.language,
-      //   builder: (context, state) => const LanguageScreen(),
-      // ),
       GoRoute(
         path: RouteNames.permissions,
         builder: (context, state) => const PermissionsScreen(),

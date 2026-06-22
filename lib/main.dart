@@ -20,6 +20,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp();
 
+  final stableId = message.messageId ?? message.data['messageId']?.toString();
+
   final command = message.data['command']?.toString();
   if (command == 'update_location') {
     await RobustBgLocationService.instance.tick(
@@ -48,8 +50,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     list = <dynamic>[];
   }
 
+  final alreadyExists =
+      stableId != null &&
+      list.whereType<Map>().any((e) => (e['id'] ?? '').toString() == stableId);
+  if (alreadyExists) {
+    print('[NotificationBadge] dedupe_skip_bg id=$stableId');
+    return;
+  }
+
   final item = {
-    'id': '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}',
+    'id':
+        stableId ??
+        '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}',
     'title': title,
     'body': body,
     'receivedAt': DateTime.now().toIso8601String(),

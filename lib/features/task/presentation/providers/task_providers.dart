@@ -25,9 +25,18 @@ final secureStorageProvider = Provider<SecureSessionStorage>((ref) {
 // Current employee ID provider for real-time access
 final currentEmployeeIdProvider = StateProvider<String?>((ref) => null);
 
+const bool _taskProviderDebugLogs = true;
+
+void _taskProviderLog(String message) {
+  if (!_taskProviderDebugLogs) return;
+  print('[TaskProviders] $message');
+}
+
 final tasksProvider = FutureProvider<List<dynamic>>((ref) async {
   final storage = ref.watch(secureStorageProvider);
   final employeeId = await storage.readEmployeeId();
+
+  _taskProviderLog('tasksProvider: read employeeId=$employeeId');
 
   if (employeeId == null) {
     throw Exception('Employee ID not found. Please login again.');
@@ -36,27 +45,59 @@ final tasksProvider = FutureProvider<List<dynamic>>((ref) async {
   // Store employee ID in provider for real-time access
   ref.read(currentEmployeeIdProvider.notifier).state = employeeId;
 
-  return ref
+  _taskProviderLog('tasksProvider: fetching tasks for employeeId=$employeeId');
+
+  final list = await ref
       .watch(taskRepositoryProvider)
       .getTasksForEmployee(int.parse(employeeId));
-});
 
-final tasksByClientProvider = FutureProvider.family<List<dynamic>, int>((
-  ref,
-  clientId,
-) async {
-  final storage = ref.read(secureStorageProvider);
-  final employeeIdStr = await storage.readEmployeeId();
-  final employeeId = int.tryParse(employeeIdStr ?? '');
-
-  if (employeeId == null) {
-    return [];
+  _taskProviderLog('tasksProvider: received length=${list.length}');
+  if (list.isNotEmpty && list.first is Map) {
+    final first = Map<String, dynamic>.from(list.first as Map);
+    _taskProviderLog(
+      'tasksProvider: first item sample id=${first['id']} clientId=${first['clientId']} startDate=${first['startDate']} scheduledStartTime=${first['scheduledStartTime']} taskName=${first['taskName']}',
+    );
   }
 
-  return ref
-      .read(taskRepositoryProvider)
-      .getTasksForEmployeeAndClient(employeeId, clientId);
+  return list;
 });
+
+final tasksByClientProvider = FutureProvider.family<List<dynamic>, int>(
+  (ref, clientId) async {
+    final storage = ref.read(secureStorageProvider);
+    final employeeIdStr = await storage.readEmployeeId();
+    final employeeId = int.tryParse(employeeIdStr ?? '');
+
+    _taskProviderLog(
+      'tasksByClientProvider: clientId=$clientId employeeIdStr=$employeeIdStr parsedEmployeeId=$employeeId',
+    );
+
+    if (employeeId == null) {
+      return [];
+    }
+
+    _taskProviderLog(
+      'tasksByClientProvider: fetching /tasks/client/$clientId/employee/$employeeId',
+    );
+
+    final list = await ref
+        .read(taskRepositoryProvider)
+        .getTasksForEmployeeAndClient(employeeId, clientId);
+
+    _taskProviderLog(
+      'tasksByClientProvider: received length=${list.length} for clientId=$clientId employeeId=$employeeId',
+    );
+    if (list.isNotEmpty && list.first is Map) {
+      final first = Map<String, dynamic>.from(list.first as Map);
+      _taskProviderLog(
+        'tasksByClientProvider: first item sample id=${first['id']} clientId=${first['clientId']} startDate=${first['startDate']} scheduledStartTime=${first['scheduledStartTime']} taskName=${first['taskName']}',
+      );
+      _taskProviderLog('tasksByClientProvider: first item keys=${first.keys.toList()}');
+    }
+
+    return list;
+  },
+);
 
 // Phase-5: Task animation state provider
 final taskAnimationProvider =
@@ -275,84 +316,25 @@ class RealTimeTaskNotifier extends StateNotifier<List<Map<String, dynamic>>> {
     if (_isListening) return;
     _isListening = true;
 
-    // Listen for task events from WebSocket
-    _ref.listen(taskEventsProvider, (previous, next) {
+    // Primary: task status updates broadcast by backend on PUT /api/tasks/{id}/status
+    _ref.listen(taskStatusUpdatesProvider, (previous, next) {
       next.when(
         data: (event) {
-          _handleTaskEvent(event);
+          final taskId = event['taskId']?.toString();
+          final status = event['status']?.toString();
+          if (taskId != null && status != null) {
+            _ref
+                .read(tasksWithDistanceProvider.notifier)
+                .updateTaskStatus(taskId, status);
+            _ref
+                .read(taskAnimationProvider.notifier)
+                .triggerAnimation(taskId, 'status_change');
+          }
         },
         loading: () {},
-        error: (error, stack) {},
+        error: (_, __) {},
       );
     });
-
-    // Listen for attendance events that might affect tasks
-    _ref.listen(attendanceEventsProvider, (previous, next) {
-      next.when(
-        data: (event) {
-          _handleAttendanceEvent(event);
-        },
-        loading: () {},
-        error: (error, stack) {},
-      );
-    });
-
-    // Listen for punch events that might affect tasks
-    _ref.listen(punchEventsProvider, (previous, next) {
-      next.when(
-        data: (event) {
-          _handlePunchEvent(event);
-        },
-        loading: () {},
-        error: (error, stack) {},
-      );
-    });
-  }
-
-  void _handleTaskEvent(Map<String, dynamic> event) {
-    final taskId = event['taskId']?.toString();
-    final status = event['status'];
-    final assignedToEmployeeId = event['assignedToEmployeeId']?.toString();
-
-    if (taskId != null && status != null) {
-      // Guard against null assignedToEmployeeId
-      if (assignedToEmployeeId == null) return;
-
-      // Get current logged-in employee ID from provider (sync)
-      final currentEmployeeId = _ref.read(currentEmployeeIdProvider);
-
-      // Skip updates for tasks not assigned to current employee
-      if (currentEmployeeId != null &&
-          assignedToEmployeeId != currentEmployeeId) {
-        return; // Ignore updates for other employees' tasks
-      }
-
-      // Phase-4: Update TaskWithDistance state
-      _ref
-          .read(tasksWithDistanceProvider.notifier)
-          .updateTaskStatus(taskId, status);
-
-      // Phase-5: Trigger animation
-      _ref
-          .read(taskAnimationProvider.notifier)
-          .triggerAnimation(taskId, 'status_change');
-    }
-  }
-
-  void _handleAttendanceEvent(Map<String, dynamic> event) {
-    // Phase-4: Update task list if attendance affects tasks
-    // Just refresh the current state without API calls
-    if (state.isNotEmpty) {
-      state = List<Map<String, dynamic>>.from(state);
-    }
-  }
-
-  void _handlePunchEvent(Map<String, dynamic> event) {
-    // Phase-4: Update task list if punch affects tasks
-    // Just refresh the current state without API calls
-    if (state.isNotEmpty) {
-      state = List<Map<String, dynamic>>.from(state);
-    }
   }
 
   @override

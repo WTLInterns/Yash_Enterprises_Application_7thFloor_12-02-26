@@ -168,6 +168,21 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
       final userRole = await _secureStorage.read(key: 'user_role');
       final userDepartment = await _secureStorage.read(key: 'user_department');
 
+      print('===== ADDRESS REQUEST - DATA SOURCE TRACING =====');
+      print('From SecureStorage:');
+      print('  employee_id: "$employeeId"');
+      print('  user_role: "$userRole"');
+      print('  user_department: "$userDepartment"');
+
+      // Also check alternative department keys
+      final altDepartment1 = await _secureStorage.read(
+        key: 'employee_department',
+      );
+      final altDepartment2 = await _secureStorage.read(key: 'department');
+      print('Alternative department keys:');
+      print('  employee_department: "$altDepartment1"');
+      print('  department: "$altDepartment2"');
+
       final requestUrl =
           '${AppConfig.apiBaseUrl}/api/customer-address-edit-requests?employeeId=$employeeId';
 
@@ -191,51 +206,113 @@ class _AddressEditRequestScreenState extends State<AddressEditRequestScreen> {
         'reason': _reasonController.text.trim(),
       };
 
-      print('===== ADDRESS EDIT REQUEST DEBUG =====');
-      print('EmployeeId: $employeeId');
-      print('Role: $userRole');
-      print('Department: $userDepartment');
-      print('Request URL: $requestUrl');
-      print('Headers:');
-      print('X-User-Id: ${requestHeaders['X-User-Id']}');
-      print('X-User-Role: ${requestHeaders['X-User-Role']}');
-      print('X-User-Department: ${requestHeaders['X-User-Department']}');
-      print('Body:');
-      print(jsonEncode(requestBody));
+      // 🚨 COMPREHENSIVE DEBUG LOGGING
+      print('===== ADDRESS REQUEST START =====');
+      print('URL: $requestUrl');
+      print('Headers: $requestHeaders');
+      print('Request Body: ${jsonEncode(requestBody)}');
+      print('Employee ID: $employeeId');
+      print('User Role: $userRole');
+      print('User Department: "$userDepartment"');
+      print('Address ID: ${widget.addressId}');
+      print(
+        'Current Lat/Lng: ${widget.currentLatitude}, ${widget.currentLongitude}',
+      );
+      print('New Lat/Lng: $_newLatitude, $_newLongitude');
+
+      print('===== DEPARTMENT ANALYSIS =====');
+      if (userDepartment == null) {
+        print('🚨 CRITICAL: userDepartment is NULL');
+      } else if (userDepartment.isEmpty) {
+        print('🚨 CRITICAL: userDepartment is EMPTY string');
+      } else if (userDepartment.trim().isEmpty) {
+        print(
+          '🚨 CRITICAL: userDepartment is whitespace only: "$userDepartment"',
+        );
+      } else {
+        print('✅ Department looks valid: "$userDepartment"');
+      }
 
       if (employeeId == null) {
+        print('===== ADDRESS REQUEST VALIDATION FAILED =====');
+        print('ERROR: Employee ID is null - user needs to login again');
         throw Exception('Employee ID not found. Please login again.');
       }
 
+      if (userDepartment == null || userDepartment.trim().isEmpty) {
+        print('===== ADDRESS REQUEST VALIDATION WARNING =====');
+        print(
+          'WARNING: User department is null or empty - this may cause issues',
+        );
+      }
+
+      print('===== SENDING HTTP REQUEST =====');
       final response = await http.post(
         Uri.parse(requestUrl),
         headers: requestHeaders,
         body: jsonEncode(requestBody),
       );
 
+      print('===== HTTP RESPONSE RECEIVED =====');
+      print('Status Code: ${response.statusCode}');
+      print('Response Headers: ${response.headers}');
+      print('Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
+        print('===== ADDRESS REQUEST SUCCESS =====');
         final data = jsonDecode(response.body);
+        print('Success Response Data: $data');
         setState(() => _requestStatus = 'PENDING');
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? 'Request submitted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                data['message'] ?? 'Request submitted successfully',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
 
         // Auto-refresh after 30 seconds
         _refreshStatus();
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'Failed to submit request');
+        print('===== ADDRESS REQUEST FAILED =====');
+        print('Status Code: ${response.statusCode}');
+        print('Error Response: ${response.body}');
+
+        try {
+          final error = jsonDecode(response.body);
+          print('Parsed Error: $error');
+          throw Exception(error['error'] ?? 'Failed to submit request');
+        } catch (parseError) {
+          print('Failed to parse error response: $parseError');
+          throw Exception(
+            'Server returned status ${response.statusCode}: ${response.body}',
+          );
+        }
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+    } catch (e, stackTrace) {
+      print('===== ADDRESS REQUEST EXCEPTION =====');
+      print('Exception Type: ${e.runtimeType}');
+      print('Exception Message: $e');
+      print('Stack Trace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      print('===== ADDRESS REQUEST END =====');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
